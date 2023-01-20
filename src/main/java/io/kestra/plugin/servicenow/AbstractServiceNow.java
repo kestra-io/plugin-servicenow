@@ -9,6 +9,7 @@ import io.micronaut.http.*;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.netty.NettyHttpClientFactory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -73,13 +74,15 @@ public abstract class AbstractServiceNow extends Task  {
     @Getter(AccessLevel.NONE)
     private transient String token;
 
+    private static final NettyHttpClientFactory FACTORY = new NettyHttpClientFactory();
+
     protected HttpClient client(String base) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
         DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
         configuration.setConnectTimeout(Duration.ofSeconds(60));
         configuration.setReadTimeout(Duration.ofSeconds(60));
         configuration.setReadIdleTimeout(Duration.ofSeconds(60));
 
-        return HttpClient.create(URI.create(base).toURL(), configuration);
+        return FACTORY.createClient(URI.create(base).toURL(), configuration);
     }
 
     private String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
