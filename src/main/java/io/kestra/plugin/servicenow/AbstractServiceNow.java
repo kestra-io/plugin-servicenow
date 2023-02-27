@@ -9,7 +9,9 @@ import io.micronaut.http.*;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.netty.DefaultHttpClient;
 import io.micronaut.http.client.netty.NettyHttpClientFactory;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -76,13 +78,18 @@ public abstract class AbstractServiceNow extends Task  {
 
     private static final NettyHttpClientFactory FACTORY = new NettyHttpClientFactory();
 
-    protected HttpClient client(String base) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
+    protected HttpClient client(RunContext runContext, String base) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
+        MediaTypeCodecRegistry mediaTypeCodecRegistry = runContext.getApplicationContext().getBean(MediaTypeCodecRegistry.class);
+
         DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
         configuration.setConnectTimeout(Duration.ofSeconds(60));
         configuration.setReadTimeout(Duration.ofSeconds(60));
         configuration.setReadIdleTimeout(Duration.ofSeconds(60));
 
-        return FACTORY.createClient(URI.create(base).toURL(), configuration);
+        DefaultHttpClient client = (DefaultHttpClient) FACTORY.createClient(URI.create(base).toURL(), configuration);
+        client.setMediaTypeCodecRegistry(mediaTypeCodecRegistry);
+
+        return client;
     }
 
     private String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
@@ -103,7 +110,7 @@ public abstract class AbstractServiceNow extends Task  {
                 "&password=" + URLEncoder.encode(runContext.render(this.password), StandardCharsets.UTF_8)
             );
 
-        try (HttpClient client = this.client(this.baseUri(runContext))) {
+        try (HttpClient client = this.client(runContext, this.baseUri(runContext))) {
             HttpResponse<Map<String, String>> exchange = client.toBlocking().exchange(request, Argument.mapOf(String.class, String.class));
 
             Map<String, String> token = exchange.body();
@@ -123,7 +130,7 @@ public abstract class AbstractServiceNow extends Task  {
                 .bearerAuth(this.token(runContext))
                 .contentType(MediaType.APPLICATION_JSON);
 
-            try (HttpClient client = this.client(this.baseUri(runContext))) {
+            try (HttpClient client = this.client(runContext, this.baseUri(runContext))) {
                 return client.toBlocking().exchange(request, argument);
             }
         } catch (HttpClientResponseException e) {
