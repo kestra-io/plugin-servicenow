@@ -22,9 +22,13 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.AbstractMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
+
+import static io.kestra.core.utils.Rethrow.throwFunction;
 
 @SuperBuilder
 @ToString
@@ -73,6 +77,12 @@ public abstract class AbstractServiceNow extends Task  {
     @PluginProperty(dynamic = true)
     private String clientSecret;
 
+    @Schema(
+        title = "The headers to pass to the request"
+    )
+    @PluginProperty(dynamic = true)
+    protected Map<CharSequence, CharSequence> headers;
+
     @Getter(AccessLevel.NONE)
     private transient String token;
 
@@ -109,6 +119,19 @@ public abstract class AbstractServiceNow extends Task  {
                 "&username=" + runContext.render(this.username) +
                 "&password=" + URLEncoder.encode(runContext.render(this.password), StandardCharsets.UTF_8)
             );
+
+
+        if (this.headers != null) {
+            request.headers(this.headers
+                .entrySet()
+                .stream()
+                .map(throwFunction(e -> new AbstractMap.SimpleEntry<>(
+                    e.getKey(),
+                    runContext.render(e.getValue().toString())
+                )))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
+            );
+        }
 
         try (HttpClient client = this.client(runContext, this.baseUri(runContext))) {
             HttpResponse<Map<String, String>> exchange = client.toBlocking().exchange(request, Argument.mapOf(String.class, String.class));
