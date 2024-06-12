@@ -3,6 +3,7 @@ package io.kestra.plugin.servicenow;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -93,7 +94,7 @@ public abstract class AbstractServiceNow extends Task  {
     private static final NettyHttpClientFactory FACTORY = new NettyHttpClientFactory();
 
     protected HttpClient client(RunContext runContext, String base) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
-        MediaTypeCodecRegistry mediaTypeCodecRegistry = runContext.getApplicationContext().getBean(MediaTypeCodecRegistry.class);
+        MediaTypeCodecRegistry mediaTypeCodecRegistry = ((DefaultRunContext)runContext).getApplicationContext().getBean(MediaTypeCodecRegistry.class);
 
         DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
         configuration.setConnectTimeout(Duration.ofSeconds(60));
