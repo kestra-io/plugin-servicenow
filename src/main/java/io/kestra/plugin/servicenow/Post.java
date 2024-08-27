@@ -41,7 +41,7 @@ import jakarta.validation.constraints.NotNull;
                        type: io.kestra.plugin.servicenow.Post
                        domain: "snow_domain"
                        username: "snow_username"
-                       password: "snow_passwd"
+                       password: "snow_password"
                        clientId: "snow_client_id"
                        clientSecret: "snow_client_secret"
                        table: incident
