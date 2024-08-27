@@ -31,19 +31,26 @@ import jakarta.validation.constraints.NotNull;
     examples = {
         @Example(
             title = "Create an incident.",
-            code = {
-                "domain: \"[[YOUR_SNOW_DOMAIN]]\"",
-                "username: \"[[YOUR_SNOW_CLIENTID]]\"",
-                "password: \"[[YOUR_SNOW_CLIENTID]]\"",
-                "clientId: \"[[YOUR_SNOW_CLIENTID]]\"",
-                "clientSecret: \"[[YOUR_SNOW_CLIENTID]]\"",
-                "table: incident",
-                "data:",
-                "  short_description: API Create Incident...",
-                "  requester_id: f8266e2adb16fb00fa638a3a489619d2",
-                "  requester_for_id: a7ec77cbdefac300d322d182689619dc",
-                "  product_id: 01a2e3c1db15f340d329d18c689ed922\n",
-            }
+            full = true,
+            code = """
+                   id: servicenow_post
+                   namespace: company.team
+                   
+                   tasks:
+                     - id: post
+                       type: io.kestra.plugin.servicenow.Post
+                       domain: "snow_domain"
+                       username: "snow_username"
+                       password: "snow_password"
+                       clientId: "snow_client_id"
+                       clientSecret: "snow_client_secret"
+                       table: incident
+                       data:
+                         short_description: "API Create Incident..."
+                         requester_id: f8266e2adb16fb00fa638a3a489619d2
+                         requester_for_id: a7ec77cbdefac300d322d182689619dc
+                         product_id: 01a2e3c1db15f340d329d18c689ed922
+                   """
         )
     }
 )
