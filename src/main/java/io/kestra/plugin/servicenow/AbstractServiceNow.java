@@ -2,6 +2,7 @@ package io.kestra.plugin.servicenow;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
@@ -85,8 +86,7 @@ public abstract class AbstractServiceNow extends Task  {
     @Schema(
         title = "The headers to pass to the request"
     )
-    @PluginProperty(dynamic = true)
-    protected Map<CharSequence, CharSequence> headers;
+    protected Property<Map<CharSequence, CharSequence>> headers;
 
     @Getter(AccessLevel.NONE)
     private transient String token;
@@ -127,7 +127,7 @@ public abstract class AbstractServiceNow extends Task  {
 
 
         if (this.headers != null) {
-            request.headers(this.headers
+            request.headers(runContext.render(this.headers).asMap(CharSequence.class, CharSequence.class)
                 .entrySet()
                 .stream()
                 .map(throwFunction(e -> new AbstractMap.SimpleEntry<>(

@@ -3,6 +3,7 @@ package io.kestra.plugin.servicenow;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.micronaut.core.type.Argument;
@@ -35,7 +36,7 @@ import jakarta.validation.constraints.NotNull;
             code = """
                    id: servicenow_post
                    namespace: company.team
-                   
+
                    tasks:
                      - id: post
                        type: io.kestra.plugin.servicenow.Post
@@ -68,8 +69,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     @Schema(
         title = "The data to insert."
     )
-    @PluginProperty(dynamic = true)
-    private Map<String, Object> data;
+    private Property<Map<String, Object>> data;
 
     @Override
     public Post.Output run(RunContext runContext) throws Exception {
@@ -85,7 +85,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
                             "table", runContext.render(this.table)
                         ))
                 )
-                .body(runContext.render(data)),
+                .body(runContext.render(data).asMap(String.class, Object.class)),
             Argument.of(PostResult.class)
         );
 
