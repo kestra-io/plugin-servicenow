@@ -2,7 +2,6 @@ package io.kestra.plugin.servicenow;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -17,7 +16,6 @@ import lombok.experimental.SuperBuilder;
 import org.slf4j.Logger;
 
 import java.util.Map;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
@@ -57,15 +55,12 @@ import jakarta.validation.constraints.NotNull;
 )
 public class Post extends AbstractServiceNow implements RunnableTask<Post.Output> {
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow table."
     )
-    @PluginProperty(dynamic = true)
-    private String table;
+    private Property<String> table;
 
     @NotNull
-    @NotEmpty
     @Schema(
         title = "The data to insert."
     )
@@ -82,7 +77,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
                     HttpMethod.POST,
                     UriTemplate.of("/api/now/table/{table}")
                         .expand(Map.of(
-                            "table", runContext.render(this.table)
+                            "table", runContext.render(this.table).as(String.class).orElseThrow()
                         ))
                 )
                 .body(runContext.render(data).asMap(String.class, Object.class)),
