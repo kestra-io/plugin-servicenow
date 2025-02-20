@@ -1,7 +1,6 @@
 package io.kestra.plugin.servicenow;
 
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.DefaultRunContext;
@@ -31,7 +30,6 @@ import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.stream.Collectors;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
@@ -81,6 +79,9 @@ public abstract class AbstractServiceNow extends Task  {
     @Getter(AccessLevel.NONE)
     private transient String token;
 
+    @Getter(AccessLevel.NONE)
+    private transient String uri;
+
     private static final NettyHttpClientFactory FACTORY = new NettyHttpClientFactory();
 
     protected HttpClient client(RunContext runContext, String base) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
@@ -98,6 +99,9 @@ public abstract class AbstractServiceNow extends Task  {
     }
 
     private String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
+        if (this.uri != null) {
+            return this.uri;
+        }
         return "https://" + runContext.render(this.domain).as(String.class).orElseThrow() + ".service-now.com/";
     }
 

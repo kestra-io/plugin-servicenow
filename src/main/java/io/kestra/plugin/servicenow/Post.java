@@ -2,7 +2,6 @@ package io.kestra.plugin.servicenow;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -17,7 +16,6 @@ import lombok.experimental.SuperBuilder;
 import org.slf4j.Logger;
 
 import java.util.Map;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
