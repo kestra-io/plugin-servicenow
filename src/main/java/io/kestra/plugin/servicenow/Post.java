@@ -1,20 +1,18 @@
 package io.kestra.plugin.servicenow;
 
+import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.uri.UriTemplate;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.slf4j.Logger;
 
+import java.net.URI;
 import java.util.Map;
 import jakarta.validation.constraints.NotNull;
 
@@ -70,28 +68,24 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     public Post.Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
 
-        HttpResponse<PostResult> request = this.request(
-            runContext,
-            HttpRequest
-                .create(
-                    HttpMethod.POST,
-                    UriTemplate.of("/api/now/table/{table}")
-                        .expand(Map.of(
-                            "table", runContext.render(this.table).as(String.class).orElseThrow()
-                        ))
-                )
-                .body(runContext.render(data).asMap(String.class, Object.class)),
-            Argument.of(PostResult.class)
-        );
+        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
+            .uri(URI.create(baseUri(runContext) + "/api/now/table/" + runContext.render(this.table).as(String.class).orElseThrow()))
+            .method("POST")
+            .body(HttpRequest.JsonRequestBody.builder()
+                .content(runContext.render(data).asMap(String.class, Object.class))
+                .build());
 
-        if (request.getBody().isEmpty()) {
-            throw new IllegalStateException("Empty body on '" + request + "'");
+        HttpResponse<PostResult> response = this.request(runContext, requestBuilder, PostResult.class);
+
+        if (response.getBody() == null) {
+            throw new IllegalStateException("Empty body on '" + response + "'");
         }
 
-        logger.info("Post done with result '{}'", request.getBody().orElse(null));
+        logger.info("Post done with result '{}'", response.getBody());
+
 
         return Output.builder()
-            .result(request.getBody().get().getResult())
+            .result(response.getBody().getResult())
             .build();
     }
 
