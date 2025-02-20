@@ -57,15 +57,12 @@ import jakarta.validation.constraints.NotNull;
 )
 public class Post extends AbstractServiceNow implements RunnableTask<Post.Output> {
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow table."
     )
-    @PluginProperty(dynamic = true)
-    private String table;
+    private Property<String> table;
 
     @NotNull
-    @NotEmpty
     @Schema(
         title = "The data to insert."
     )
@@ -82,7 +79,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
                     HttpMethod.POST,
                     UriTemplate.of("/api/now/table/{table}")
                         .expand(Map.of(
-                            "table", runContext.render(this.table)
+                            "table", runContext.render(this.table).as(String.class).orElseThrow()
                         ))
                 )
                 .body(runContext.render(data).asMap(String.class, Object.class)),

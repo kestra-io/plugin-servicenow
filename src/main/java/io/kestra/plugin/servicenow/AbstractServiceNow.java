@@ -43,45 +43,35 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 public abstract class AbstractServiceNow extends Task  {
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow domain.",
         description = "Will be used to generate the url: `https://[[DOMAIN]].service-now.com/`"
     )
-    @PluginProperty(dynamic = true)
-    private String domain;
+    private Property<String> domain;
 
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow username."
     )
-    @PluginProperty(dynamic = true)
-    private String username;
+    private Property<String> username;
 
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow password."
     )
-    @PluginProperty(dynamic = true)
-    private String password;
+    private Property<String> password;
 
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow client ID."
     )
-    @PluginProperty(dynamic = true)
-    private String clientId;
+    private Property<String> clientId;
 
     @NotNull
-    @NotEmpty
     @Schema(
         title = "ServiceNow client secret."
     )
-    @PluginProperty(dynamic = true)
-    private String clientSecret;
+    private Property<String> clientSecret;
 
     @Schema(
         title = "The headers to pass to the request"
@@ -108,7 +98,7 @@ public abstract class AbstractServiceNow extends Task  {
     }
 
     private String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
-        return "https://" + runContext.render(this.domain) + ".service-now.com/";
+        return "https://" + runContext.render(this.domain).as(String.class).orElseThrow() + ".service-now.com/";
     }
 
     private String token(RunContext runContext) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
@@ -119,10 +109,10 @@ public abstract class AbstractServiceNow extends Task  {
         MutableHttpRequest<String> request = HttpRequest.create(HttpMethod.POST, "/oauth_token.do")
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body("grant_type=password" +
-                "&client_id=" + runContext.render(this.clientId) +
-                "&client_secret=" + runContext.render(this.clientSecret) +
-                "&username=" + runContext.render(this.username) +
-                "&password=" + URLEncoder.encode(runContext.render(this.password), StandardCharsets.UTF_8)
+                "&client_id=" + runContext.render(this.clientId).as(String.class).orElseThrow() +
+                "&client_secret=" + runContext.render(this.clientSecret).as(String.class).orElseThrow() +
+                "&username=" + runContext.render(this.username).as(String.class).orElseThrow() +
+                "&password=" + URLEncoder.encode(runContext.render(this.password).as(String.class).orElseThrow(), StandardCharsets.UTF_8)
             );
 
 
