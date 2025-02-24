@@ -1,34 +1,31 @@
 package io.kestra.plugin.servicenow;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.DefaultRunContext;
 import io.kestra.core.runners.RunContext;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.client.DefaultHttpClientConfiguration;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.netty.DefaultHttpClient;
-import io.micronaut.http.client.netty.NettyHttpClientFactory;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
+import io.kestra.core.http.client.HttpClient;
+import io.kestra.core.http.client.HttpClientException;
+import io.kestra.core.http.client.configurations.HttpConfiguration;
+import io.kestra.core.utils.Rethrow;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
-import java.net.MalformedURLException;
+import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import jakarta.validation.constraints.NotNull;
 
@@ -40,41 +37,38 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractServiceNow extends Task  {
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        .registerModule(new JavaTimeModule());
+
     @NotNull
     @Schema(
         title = "ServiceNow domain.",
-        description = "Will be used to generate the url: `https://[[DOMAIN]].service-now.com/`"
+        description = "Will be used to generate the URL: `https://[[DOMAIN]].service-now.com/`"
     )
     private Property<String> domain;
 
     @NotNull
-    @Schema(
-        title = "ServiceNow username."
-    )
+    @Schema(title = "ServiceNow username.")
     private Property<String> username;
 
     @NotNull
-    @Schema(
-        title = "ServiceNow password."
-    )
+    @Schema(title = "ServiceNow password.")
     private Property<String> password;
 
     @NotNull
-    @Schema(
-        title = "ServiceNow client ID."
-    )
+    @Schema(title = "ServiceNow client ID.")
     private Property<String> clientId;
 
     @NotNull
-    @Schema(
-        title = "ServiceNow client secret."
-    )
+    @Schema(title = "ServiceNow client secret.")
     private Property<String> clientSecret;
 
-    @Schema(
-        title = "The headers to pass to the request"
-    )
+    @Schema(title = "The headers to pass to the request")
     protected Property<Map<CharSequence, CharSequence>> headers;
+
+    @Schema(title = "The HTTP client configuration.")
+    protected HttpConfiguration options;
 
     @Getter(AccessLevel.NONE)
     private transient String token;
@@ -82,86 +76,90 @@ public abstract class AbstractServiceNow extends Task  {
     @Getter(AccessLevel.NONE)
     private transient String uri;
 
-    private static final NettyHttpClientFactory FACTORY = new NettyHttpClientFactory();
-
-    protected HttpClient client(RunContext runContext, String base) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
-        MediaTypeCodecRegistry mediaTypeCodecRegistry = ((DefaultRunContext)runContext).getApplicationContext().getBean(MediaTypeCodecRegistry.class);
-
-        DefaultHttpClientConfiguration configuration = new DefaultHttpClientConfiguration();
-        configuration.setConnectTimeout(Duration.ofSeconds(60));
-        configuration.setReadTimeout(Duration.ofSeconds(60));
-        configuration.setReadIdleTimeout(Duration.ofSeconds(60));
-
-        DefaultHttpClient client = (DefaultHttpClient) FACTORY.createClient(URI.create(base).toURL(), configuration);
-        client.setMediaTypeCodecRegistry(mediaTypeCodecRegistry);
-
-        return client;
-    }
-
-    private String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
+    protected String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
         if (this.uri != null) {
             return this.uri;
         }
         return "https://" + runContext.render(this.domain).as(String.class).orElseThrow() + ".service-now.com/";
     }
 
-    private String token(RunContext runContext) throws IllegalVariableEvaluationException, MalformedURLException, URISyntaxException {
+    private String token(RunContext runContext) throws IllegalVariableEvaluationException, HttpClientException {
         if (this.token != null) {
             return this.token;
         }
 
-        MutableHttpRequest<String> request = HttpRequest.create(HttpMethod.POST, "/oauth_token.do")
-            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-            .body("grant_type=password" +
-                "&client_id=" + runContext.render(this.clientId).as(String.class).orElseThrow() +
-                "&client_secret=" + runContext.render(this.clientSecret).as(String.class).orElseThrow() +
-                "&username=" + runContext.render(this.username).as(String.class).orElseThrow() +
-                "&password=" + URLEncoder.encode(runContext.render(this.password).as(String.class).orElseThrow(), StandardCharsets.UTF_8)
-            );
+        URI uri = URI.create(baseUri(runContext) + "/oauth_token.do");
 
+        Map<String, String> requestBody = Map.of(
+            "grant_type", "password",
+            "client_id", runContext.render(this.clientId).as(String.class).orElseThrow(),
+            "client_secret", runContext.render(this.clientSecret).as(String.class).orElseThrow(),
+            "username", runContext.render(this.username).as(String.class).orElseThrow(),
+            "password", URLEncoder.encode(runContext.render(this.password).as(String.class).orElseThrow(), StandardCharsets.UTF_8)
+        );
+
+        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
+            .uri(uri)
+            .method("POST")
+            .body(HttpRequest.JsonRequestBody.builder().content(requestBody).build())
+            .addHeader("Content-Type", "application/x-www-form-urlencoded");
 
         if (this.headers != null) {
-            request.headers(runContext.render(this.headers).asMap(CharSequence.class, CharSequence.class)
-                .entrySet()
-                .stream()
-                .map(throwFunction(e -> new AbstractMap.SimpleEntry<>(
-                    e.getKey(),
-                    runContext.render(e.getValue().toString())
-                )))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue))
-            );
+            runContext.render(this.headers)
+                .asMap(CharSequence.class, CharSequence.class)
+                .forEach((key, value) -> {
+                    try {
+                        requestBuilder.addHeader(
+                            key.toString(),
+                            runContext.render(value.toString())
+                        );
+                    } catch (IllegalVariableEvaluationException ex) {
+                        throw new RuntimeException("Failed to render header value", ex);
+                    }
+                });
         }
 
-        try (HttpClient client = this.client(runContext, this.baseUri(runContext))) {
-            HttpResponse<Map<String, String>> exchange = client.toBlocking().exchange(request, Argument.mapOf(String.class, String.class));
+        try (HttpClient client = new HttpClient(runContext, options)) {
+            HttpResponse<Map<String, String>> exchange = client.request(requestBuilder.build());
 
-            Map<String, String> token = exchange.body();
-
-            if (token == null || !token.containsKey("access_token")) {
-                throw new IllegalStateException("Invalid token request with response " + token);
+            Map<String, String> tokenResponse = exchange.getBody();
+            if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
+                throw new IllegalStateException("Invalid token request with response " + tokenResponse);
             }
-            this.token = token.get("access_token");
-
+            this.token = tokenResponse.get("access_token");
             return this.token;
+        } catch (IOException e) {
+            throw new RuntimeException("Error fetching access token", e);
         }
     }
 
-    protected <REQ, RES> HttpResponse<RES> request(RunContext runContext, MutableHttpRequest<REQ> request, Argument<RES> argument) throws HttpClientResponseException {
-        try {
-            request = request
-                .bearerAuth(this.token(runContext))
-                .contentType(MediaType.APPLICATION_JSON);
 
-            try (HttpClient client = this.client(runContext, this.baseUri(runContext))) {
-                return client.toBlocking().exchange(request, argument);
-            }
+    protected <RES> HttpResponse<RES> request(RunContext runContext, HttpRequest.HttpRequestBuilder requestBuilder, Class<RES> responseType)
+        throws HttpClientException, IllegalVariableEvaluationException {
+
+        var request = requestBuilder
+            .addHeader("Authorization", "Bearer " + this.token(runContext))
+            .addHeader("Content-Type", "application/json")
+            .build();
+
+        try (HttpClient client = new HttpClient(runContext, options)) {
+            HttpResponse<String> response = client.request(request, String.class);
+            RES parsedResponse = MAPPER.readValue(response.getBody(), responseType);
+            return HttpResponse.<RES>builder()
+                .request(request)
+                .body(parsedResponse)
+                .headers(response.getHeaders())
+                .status(response.getStatus())
+                .build();
         } catch (HttpClientResponseException e) {
             throw new HttpClientResponseException(
-                "Request failed '" + e.getStatus().getCode() + "' and body '" + e.getResponse().getBody(String.class).orElse("null") + "'",
+                "Request failed '" + Objects.requireNonNull(e.getResponse()).getStatus().getCode() +
+                    "' and body '" + e.getResponse().getBody() + "'",
                 e.getResponse()
             );
-        } catch (IllegalVariableEvaluationException | MalformedURLException | URISyntaxException e) {
-            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException("Error parsing response body", e);
         }
-    }
+        }
+
 }
