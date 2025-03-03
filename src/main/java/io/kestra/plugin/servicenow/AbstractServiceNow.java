@@ -88,7 +88,7 @@ public abstract class AbstractServiceNow extends Task  {
             return this.token;
         }
 
-        URI uri = URI.create(baseUri(runContext) + "/oauth_token.do");
+        URI uri = URI.create(baseUri(runContext) + "oauth_token.do");
 
         Map<String, String> requestBody = Map.of(
             "grant_type", "password",
