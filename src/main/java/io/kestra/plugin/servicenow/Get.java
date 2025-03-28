@@ -16,7 +16,6 @@ import org.slf4j.Logger;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @SuperBuilder
 @ToString
@@ -29,7 +28,7 @@ import java.util.Optional;
 @Plugin(
     examples = {
         @Example(
-            title = "Get an incident.",
+            title = "Get incidents using BasicAuth.",
             full = true,
             code = """
                    id: servicenow_get
@@ -41,14 +40,25 @@ import java.util.Optional;
                        domain: "snow_domain"
                        username: "snow_username"
                        password: "snow_password"
-                       clientId: "snow_client_id"
-                       clientSecret: "snow_client_secret"
                        table: incident
-                       data:
-                         short_description: "API Create Incident..."
-                         requester_id: f8266e2adb16fb00fa638a3a489619d2
-                         requester_for_id: a7ec77cbdefac300d322d182689619dc
-                         product_id: 01a2e3c1db15f340d329d18c689ed922
+                   """
+        ),
+        @Example(
+            title = "Get incidents using OAuth.",
+            full = true,
+            code = """
+                   id: servicenow_get
+                   namespace: company.team
+
+                   tasks:
+                     - id: get
+                       type: io.kestra.plugin.servicenow.Get
+                       domain: "snow_domain"
+                       username: "snow_username"
+                       password: "snow_password"
+                       clientId: "my_registered_kestra_application_client_id"
+                       clientSecret: "my_registered_kestra_application_client_secret"
+                       table: incident
                    """
         )
     }
