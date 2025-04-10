@@ -101,7 +101,7 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
 
-    testImplementation 'org.wiremock:wiremock:3.9.1'
+    testImplementation "org.wiremock:wiremock-jetty12"
 }
 
 /**********************************************************************************************************************\
