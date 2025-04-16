@@ -22,7 +22,7 @@ import jakarta.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Insert data inside a ServiceNow table."
+    title = "Insert data into a ServiceNow table."
 )
 @Plugin(
     examples = {

@@ -23,7 +23,7 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Retrieve multiple records for a specified ServiceNow table."
+    title = "Retrieve multiple records from a ServiceNow table."
 )
 @Plugin(
     examples = {
