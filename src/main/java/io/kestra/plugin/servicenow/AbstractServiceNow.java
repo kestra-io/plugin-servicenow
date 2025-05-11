@@ -147,7 +147,11 @@ public abstract class AbstractServiceNow extends Task {
         var request = requestBuilder.build();
         try (HttpClient client = new HttpClient(runContext, options)) {
             HttpResponse<String> response = client.request(request, String.class);
-            RES parsedResponse = MAPPER.readValue(response.getBody(), responseType);
+            RES parsedResponse = null;
+            if (responseType != Void.class && response.getBody() != null && !response.getBody().isEmpty()) {
+                parsedResponse = MAPPER.readValue(response.getBody(), responseType);
+            }
+
             return HttpResponse.<RES>builder()
                 .request(request)
                 .body(parsedResponse)
