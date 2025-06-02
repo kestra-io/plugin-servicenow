@@ -34,12 +34,12 @@ class GetTest {
         ));
 
         Get task = Get.builder()
-            .table(new Property<>("{{ table }}"))
-            .clientId(Property.of("clientId"))
-            .clientSecret(Property.of("clientSecret"))
-            .username(Property.of("username"))
-            .password(Property.of("password"))
-            .domain(Property.of("kestra"))
+            .table(Property.ofExpression("{{ table }}"))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
             .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/") //Used only for testing
             .build();
 
