@@ -34,14 +34,14 @@ public class UpdateTest {
          RunContext runContext = runContextFactory.of(Map.of());
 
          Update task = Update.builder()
-             .table(Property.of(tableName))
+             .table(Property.ofValue(tableName))
              .sysId(new Property<>(sysId))
-             .data(Property.of(Map.of("short_description", "Updated description")))
-             .clientId(Property.of("clientId"))
-             .clientSecret(Property.of("clientSecret"))
-             .username(Property.of("username"))
-             .password(Property.of("password"))
-             .domain(Property.of("kestra"))
+             .data(Property.ofValue(Map.of("short_description", "Updated description")))
+             .clientId(Property.ofValue("clientId"))
+             .clientSecret(Property.ofValue("clientSecret"))
+             .username(Property.ofValue("username"))
+             .password(Property.ofValue("password"))
+             .domain(Property.ofValue("kestra"))
              .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
              .build();
 
