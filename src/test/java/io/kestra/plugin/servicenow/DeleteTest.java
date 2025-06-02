@@ -34,13 +34,13 @@ public class DeleteTest {
         RunContext runContext = runContextFactory.of(Map.of());
 
         Delete task = Delete.builder()
-            .table(Property.of(tableName))
-            .sysId(Property.of(sysId))
-            .clientId(Property.of("clientId"))
-            .clientSecret(Property.of("clientSecret"))
-            .username(Property.of("username"))
-            .password(Property.of("password"))
-            .domain(Property.of("kestra"))
+            .table(Property.ofValue(tableName))
+            .sysId(Property.ofValue(sysId))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
             .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
             .build();
 
