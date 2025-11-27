@@ -1,0 +1,8 @@
+group: io.kestra.plugin.servicenow
+name: "servicenow"
+title: "ServiceNow"
+description: "This sub-group of plugins contains tasks for using ServiceNow. ServiceNow allows employees to work the way they want to, not how software dictates they have to."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
