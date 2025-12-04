@@ -1,8 +1,8 @@
 group: io.kestra.plugin.servicenow
 name: "servicenow"
 title: "ServiceNow"
-description: "This sub-group of plugins contains tasks for using ServiceNow. ServiceNow allows employees to work the way they want to, not how software dictates they have to."
-body: ""
+description: "Tasks that create, update, read, and delete ServiceNow records via REST."
+body: "Set the ServiceNow instance URL with credentials or basic auth, choose the table, and provide request bodies or sys_ids to post, update, fetch, or delete records; responses include the JSON payloads for downstream handling."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
