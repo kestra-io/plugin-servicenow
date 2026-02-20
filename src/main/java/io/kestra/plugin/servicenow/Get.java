@@ -23,7 +23,8 @@ import java.util.Map;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Retrieve multiple records from a ServiceNow table."
+    title = "Fetch records from a ServiceNow table",
+    description = "Reads rows from the specified table using Basic Auth or the OAuth password grant and returns the raw ServiceNow payload plus the count."
 )
 @Plugin(
     examples = {
@@ -66,7 +67,8 @@ import java.util.Map;
 public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> {
     @NotNull
     @Schema(
-        title = "ServiceNow table."
+        title = "ServiceNow table",
+        description = "API name of the table to query (for example `incident`)."
     )
     private Property<String> table;
 
@@ -98,12 +100,14 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The result data."
+            title = "Result records",
+            description = "List of rows exactly as returned by ServiceNow."
         )
         private List<Map<String, Object>> results;
 
         @Schema(
-            title = "Results size."
+            title = "Result size",
+            description = "Number of records returned in `results`."
         )
         private Integer size;
     }

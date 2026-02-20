@@ -22,7 +22,8 @@ import jakarta.validation.constraints.NotNull;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Insert data into a ServiceNow table."
+    title = "Create a record in a ServiceNow table",
+    description = "Sends a JSON body to the table REST API using Basic Auth or the OAuth password grant and returns the created record."
 )
 @Plugin(
     examples = {
@@ -75,13 +76,15 @@ import jakarta.validation.constraints.NotNull;
 public class Post extends AbstractServiceNow implements RunnableTask<Post.Output> {
     @NotNull
     @Schema(
-        title = "ServiceNow table."
+        title = "ServiceNow table",
+        description = "API name of the table to insert into (for example `incident`)."
     )
     private Property<String> table;
 
     @NotNull
     @Schema(
-        title = "The data to insert."
+        title = "Record payload",
+        description = "Map rendered to JSON and sent as the request body."
     )
     private Property<Map<String, Object>> data;
 
@@ -114,7 +117,8 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The result data.."
+            title = "Created record",
+            description = "ServiceNow response for the inserted row."
         )
         private Map<String, Object> result;
     }
