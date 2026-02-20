@@ -38,29 +38,29 @@ public abstract class AbstractServiceNow extends Task {
 
     @NotNull
     @Schema(
-        title = "ServiceNow domain.",
-        description = "Will be used to generate the URL: `https://[[DOMAIN]].service-now.com/`"
+        title = "ServiceNow domain",
+        description = "Subdomain used to build `https://<domain>.service-now.com/`; do not include protocol"
     )
     private Property<String> domain;
 
     @NotNull
-    @Schema(title = "ServiceNow username.", description = "to be used with 'password' for a BasicAuth authentication")
+    @Schema(title = "ServiceNow username", description = "Used with 'password' for Basic Auth or with client credentials for the OAuth password grant")
     private Property<String> username;
 
     @NotNull
-    @Schema(title = "ServiceNow password.", description = "to be used with 'username'")
+    @Schema(title = "ServiceNow password", description = "Account password used with 'username' for Basic Auth or OAuth password grant")
     private Property<String> password;
 
-    @Schema(title = "ServiceNow client ID.", description = "to be used with 'clientSecret', 'username' and 'password' for a OAuth authentication")
+    @Schema(title = "ServiceNow OAuth client ID", description = "Required with 'clientSecret' plus 'username' and 'password' to switch requests to OAuth bearer tokens")
     private Property<String> clientId;
 
-    @Schema(title = "ServiceNow client secret.", description = "to be used with 'clientId'")
+    @Schema(title = "ServiceNow OAuth client secret", description = "Paired with 'clientId' when using the OAuth password grant")
     private Property<String> clientSecret;
 
-    @Schema(title = "The headers to pass to the request")
+    @Schema(title = "Additional request headers", description = "Optional key/value headers rendered per execution and sent with every call")
     protected Property<Map<CharSequence, CharSequence>> headers;
 
-    @Schema(title = "The HTTP client configuration.")
+    @Schema(title = "HTTP client configuration", description = "Advanced HTTP settings such as timeouts, proxies, and TLS; defaults to Kestra HTTP client values")
     protected HttpConfiguration options;
 
     @Getter(AccessLevel.NONE)

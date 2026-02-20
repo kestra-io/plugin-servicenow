@@ -18,15 +18,15 @@ import java.net.URI;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Schema(title = "Delete a record from a ServiceNow table.")
+@Schema(title = "Delete a ServiceNow record by sys_id", description = "Calls the table REST API with DELETE using Basic Auth or the OAuth password grant and flags success when ServiceNow returns HTTP 204.")
 public class Delete extends AbstractServiceNow implements RunnableTask<Delete.Output> {
 
     @NotNull
-    @Schema(title = "ServiceNow table.")
+    @Schema(title = "ServiceNow table", description = "API name of the table containing the record.")
     private Property<String> table;
 
     @NotNull
-    @Schema(title = "The sys_id of the record to delete.")
+    @Schema(title = "Record sys_id", description = "Unique identifier of the record to delete.")
     private Property<String> sysId;
 
     @Override
