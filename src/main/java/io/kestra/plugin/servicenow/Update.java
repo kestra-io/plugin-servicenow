@@ -18,19 +18,19 @@ import java.util.Map;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Schema(title = "Update a record in a ServiceNow table.")
+@Schema(title = "Update a ServiceNow record by sys_id", description = "Issues a PUT to the table REST API to change fields on the specified record using Basic Auth or the OAuth password grant.")
 public class Update extends AbstractServiceNow implements RunnableTask<Update.Output> {
 
     @NotNull
-    @Schema(title = "ServiceNow table.")
+    @Schema(title = "ServiceNow table", description = "API name of the table containing the record.")
     private Property<String> table;
 
     @NotNull
-    @Schema(title = "The sys_id of the record to update.")
+    @Schema(title = "Record sys_id", description = "Unique identifier of the record to update.")
     private Property<String> sysId;
 
     @NotNull
-    @Schema(title = "The fields to update.")
+    @Schema(title = "Fields to update", description = "Key/value map rendered to JSON and sent in the PUT body.")
     private Property<Map<String, Object>> data;
 
     @Override
