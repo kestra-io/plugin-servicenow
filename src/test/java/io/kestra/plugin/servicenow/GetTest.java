@@ -1,15 +1,18 @@
 package io.kestra.plugin.servicenow;
 
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Test;
 
-import java.util.Map;
+import jakarta.inject.Inject;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -29,9 +32,11 @@ class GetTest {
         stubFor(any(urlPathEqualTo("/service-now.com/api/now/table/fakeTableName")).willReturn(okJson(DATA)));
         stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
 
-        RunContext runContext = runContextFactory.of(Map.of(
-            "table", tableName
-        ));
+        RunContext runContext = runContextFactory.of(
+            Map.of(
+                "table", tableName
+            )
+        );
 
         Get task = Get.builder()
             .table(Property.ofExpression("{{ table }}"))

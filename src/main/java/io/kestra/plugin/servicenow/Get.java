@@ -1,5 +1,11 @@
 package io.kestra.plugin.servicenow;
 
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.http.HttpResponse;
 import io.kestra.core.models.annotations.Example;
@@ -7,15 +13,11 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import org.slf4j.Logger;
-
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -32,35 +34,35 @@ import java.util.Map;
             title = "Get incidents using BasicAuth.",
             full = true,
             code = """
-                   id: servicenow_get
-                   namespace: company.team
+                id: servicenow_get
+                namespace: company.team
 
-                   tasks:
-                     - id: get
-                       type: io.kestra.plugin.servicenow.Get
-                       domain: "snow_domain"
-                       username: "snow_username"
-                       password: "snow_password"
-                       table: incident
-                   """
+                tasks:
+                  - id: get
+                    type: io.kestra.plugin.servicenow.Get
+                    domain: "snow_domain"
+                    username: "snow_username"
+                    password: "snow_password"
+                    table: incident
+                """
         ),
         @Example(
             title = "Get incidents using OAuth.",
             full = true,
             code = """
-                   id: servicenow_get
-                   namespace: company.team
+                id: servicenow_get
+                namespace: company.team
 
-                   tasks:
-                     - id: get
-                       type: io.kestra.plugin.servicenow.Get
-                       domain: "snow_domain"
-                       username: "snow_username"
-                       password: "snow_password"
-                       clientId: "my_registered_kestra_application_client_id"
-                       clientSecret: "my_registered_kestra_application_client_secret"
-                       table: incident
-                   """
+                tasks:
+                  - id: get
+                    type: io.kestra.plugin.servicenow.Get
+                    domain: "snow_domain"
+                    username: "snow_username"
+                    password: "snow_password"
+                    clientId: "my_registered_kestra_application_client_id"
+                    clientSecret: "my_registered_kestra_application_client_secret"
+                    table: incident
+                """
         )
     }
 )

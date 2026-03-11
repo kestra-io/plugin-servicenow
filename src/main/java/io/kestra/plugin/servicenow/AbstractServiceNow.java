@@ -1,30 +1,30 @@
 package io.kestra.plugin.servicenow;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.http.client.HttpClientResponseException;
-import io.kestra.core.http.client.configurations.BasicAuthConfiguration;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.http.HttpRequest;
-import io.kestra.core.http.HttpResponse;
-import io.kestra.core.http.client.HttpClient;
-import io.kestra.core.http.client.HttpClientException;
-import io.kestra.core.http.client.configurations.HttpConfiguration;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.*;
-import lombok.experimental.SuperBuilder;
-
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
 
-import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
+import io.kestra.core.http.client.HttpClient;
+import io.kestra.core.http.client.HttpClientException;
+import io.kestra.core.http.client.HttpClientResponseException;
+import io.kestra.core.http.client.configurations.BasicAuthConfiguration;
+import io.kestra.core.http.client.configurations.HttpConfiguration;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
 @ToString
@@ -99,7 +99,8 @@ public abstract class AbstractServiceNow extends Task {
         if (this.headers != null) {
             runContext.render(this.headers)
                 .asMap(CharSequence.class, CharSequence.class)
-                .forEach((key, value) -> {
+                .forEach((key, value) ->
+                {
                     try {
                         requestBuilder.addHeader(
                             key.toString(),
@@ -124,7 +125,6 @@ public abstract class AbstractServiceNow extends Task {
             throw new RuntimeException("Error fetching access token", e);
         }
     }
-
 
     protected <RES> HttpResponse<RES> request(RunContext runContext, HttpRequest.HttpRequestBuilder requestBuilder, Class<RES> responseType)
         throws HttpClientException, IllegalVariableEvaluationException {
@@ -152,7 +152,7 @@ public abstract class AbstractServiceNow extends Task {
                 parsedResponse = MAPPER.readValue(response.getBody(), responseType);
             }
 
-            return HttpResponse.<RES>builder()
+            return HttpResponse.<RES> builder()
                 .request(request)
                 .body(parsedResponse)
                 .headers(response.getHeaders())
