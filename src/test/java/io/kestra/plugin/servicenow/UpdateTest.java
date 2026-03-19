@@ -40,7 +40,7 @@ public class UpdateTest {
 
         Update task = Update.builder()
             .table(Property.ofValue(tableName))
-            .sysId(new Property<>(sysId))
+            .sysId(Property.ofValue(sysId))
             .data(Property.ofValue(Map.of("short_description", "Updated description")))
             .clientId(Property.ofValue("clientId"))
             .clientSecret(Property.ofValue("clientSecret"))
