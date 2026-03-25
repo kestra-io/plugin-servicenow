@@ -1,5 +1,6 @@
 package io.kestra.plugin.servicenow;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,82 @@ class GetTest {
         assertThat(output.getSize(), is(1));
         assertThat(output.getResults().getFirst().size(), is(65));
         assertThat(output.getResults().getFirst().get("number"), is("PRB0000050"));
+    }
+
+    @Test
+    void runWithQuery(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+        stubFor(any(urlPathEqualTo("/service-now.com/api/now/table/incident")).willReturn(okJson(DATA)));
+        stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Get.builder()
+            .table(Property.ofValue("incident"))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
+            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .query(Property.ofValue("active=true^priority=1"))
+            .build();
+
+        task.run(runContext);
+
+        verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+            .withQueryParam("sysparm_query", equalTo("active=true^priority=1")));
+    }
+
+    @Test
+    void runWithLimitAndOffset(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+        stubFor(any(urlPathEqualTo("/service-now.com/api/now/table/incident")).willReturn(okJson(DATA)));
+        stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Get.builder()
+            .table(Property.ofValue("incident"))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
+            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .limit(Property.ofValue(10))
+            .offset(Property.ofValue(20))
+            .build();
+
+        var output = task.run(runContext);
+
+        verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+            .withQueryParam("sysparm_limit", equalTo("10"))
+            .withQueryParam("sysparm_offset", equalTo("20")));
+
+        assertThat(output.getOffset(), is(20));
+    }
+
+    @Test
+    void runWithFields(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+        stubFor(any(urlPathEqualTo("/service-now.com/api/now/table/incident")).willReturn(okJson(DATA)));
+        stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Get.builder()
+            .table(Property.ofValue("incident"))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
+            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .fields(Property.ofValue(List.of("number", "short_description")))
+            .build();
+
+        task.run(runContext);
+
+        verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+            .withQueryParam("sysparm_fields", equalTo("number,short_description")));
     }
 
     static final String DATA = """
