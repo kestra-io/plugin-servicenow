@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.kestra.core.models.tasks.common.FetchType;
+
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 
@@ -130,6 +132,31 @@ class GetTest {
 
         verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
             .withQueryParam("sysparm_fields", equalTo("number,short_description")));
+    }
+
+    @Test
+    void runWithStore(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+        stubFor(any(urlPathEqualTo("/service-now.com/api/now/table/incident")).willReturn(okJson(DATA)));
+        stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Get.builder()
+            .table(Property.ofValue("incident"))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
+            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .fetchType(Property.ofValue(FetchType.STORE))
+            .build();
+
+        var output = task.run(runContext);
+
+        assertThat(output.getUri() != null, is(true));
+        assertThat(output.getResults() == null, is(true));
+        assertThat(output.getSize(), is(1));
     }
 
     static final String DATA = """

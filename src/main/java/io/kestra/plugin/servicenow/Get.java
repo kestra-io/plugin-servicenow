@@ -1,5 +1,7 @@
 package io.kestra.plugin.servicenow;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +18,10 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.FileSerde;
+import reactor.core.publisher.Flux;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -91,10 +96,39 @@ import lombok.experimental.SuperBuilder;
                     limit: 100
                     offset: 0
                 """
+        ),
+        @Example(
+            title = "Stream incidents to internal storage as ION.",
+            full = true,
+            code = """
+                id: servicenow_get_store
+                namespace: company.team
+
+                tasks:
+                  - id: get
+                    type: io.kestra.plugin.servicenow.Get
+                    domain: "{{ secret('SNOW_DOMAIN') }}"
+                    username: "{{ secret('SNOW_USERNAME') }}"
+                    password: "{{ secret('SNOW_PASSWORD') }}"
+                    table: incident
+                    fetchType: STORE
+                """
         )
     }
 )
 public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> {
+    @Schema(
+        title = "Fetch type",
+        description = """
+            Controls how results are returned:
+            FETCH (default) returns all records in memory,
+            FETCH_ONE returns only the first record,
+            STORE writes all records as ION to internal storage and returns a URI.
+            """
+    )
+    @Builder.Default
+    private Property<FetchType> fetchType = Property.ofValue(FetchType.FETCH);
+
     @NotNull
     @Schema(
         title = "ServiceNow table",
@@ -149,12 +183,38 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
 
         var results = response.getBody().getResult();
         var rOffset = runContext.render(this.offset).as(Integer.class).orElse(null);
+        var rFetchType = runContext.render(this.fetchType).as(FetchType.class).orElse(FetchType.FETCH);
 
-        return Output.builder()
-            .results(results)
-            .size(results.size())
-            .offset(rOffset)
-            .build();
+        return switch (rFetchType) {
+            case FETCH_ONE -> {
+                List<Map<String, Object>> first = results.isEmpty()
+                    ? List.of()
+                    : List.of(results.getFirst());
+                yield Output.builder()
+                    .results(first)
+                    .size(first.size())
+                    .offset(rOffset)
+                    .build();
+            }
+            case STORE -> {
+                var tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+                try (var output = new BufferedWriter(new FileWriter(tempFile), FileSerde.BUFFER_SIZE)) {
+                    var flux = Flux.fromIterable(results);
+                    FileSerde.writeAll(output, flux).block();
+                }
+                var uri = runContext.storage().putFile(tempFile);
+                yield Output.builder()
+                    .size(results.size())
+                    .offset(rOffset)
+                    .uri(uri)
+                    .build();
+            }
+            default -> Output.builder()
+                .results(results)
+                .size(results.size())
+                .offset(rOffset)
+                .build();
+        };
     }
 
     private String buildQueryString(RunContext runContext) throws Exception {
@@ -190,13 +250,13 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Result records",
-            description = "List of rows exactly as returned by ServiceNow."
+            description = "List of rows exactly as returned by ServiceNow. Null when fetchType is STORE."
         )
         private List<Map<String, Object>> results;
 
         @Schema(
             title = "Result size",
-            description = "Number of records returned in `results`."
+            description = "Number of records returned or written."
         )
         private Integer size;
 
@@ -205,6 +265,12 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
             description = "Value of `sysparm_offset` sent with this request. Null when no offset was specified. Add `size` to this value to get the offset for the next page."
         )
         private Integer offset;
+
+        @Schema(
+            title = "Storage URI",
+            description = "URI of the ION file in internal storage. Set only when fetchType is STORE."
+        )
+        private URI uri;
     }
 
     @Data
