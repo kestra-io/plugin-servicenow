@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -81,6 +82,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
         title = "ServiceNow table",
         description = "API name of the table to insert into (for example `incident`)."
     )
+    @PluginProperty(group = "main")
     private Property<String> table;
 
     @NotNull
@@ -88,6 +90,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
         title = "Record payload",
         description = "Map rendered to JSON and sent as the request body."
     )
+    @PluginProperty(group = "main")
     private Property<Map<String, Object>> data;
 
     @Override
