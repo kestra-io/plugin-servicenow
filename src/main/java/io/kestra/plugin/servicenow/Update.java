@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -26,14 +27,17 @@ public class Update extends AbstractServiceNow implements RunnableTask<Update.Ou
 
     @NotNull
     @Schema(title = "ServiceNow table", description = "API name of the table containing the record.")
+    @PluginProperty(group = "main")
     private Property<String> table;
 
     @NotNull
     @Schema(title = "Record sys_id", description = "Unique identifier of the record to update.")
+    @PluginProperty(group = "main")
     private Property<String> sysId;
 
     @NotNull
     @Schema(title = "Fields to update", description = "Key/value map rendered to JSON and sent in the PUT body.")
+    @PluginProperty(group = "main")
     private Property<Map<String, Object>> data;
 
     @Override

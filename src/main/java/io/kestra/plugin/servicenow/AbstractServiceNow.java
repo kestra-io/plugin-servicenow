@@ -25,6 +25,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -41,26 +42,33 @@ public abstract class AbstractServiceNow extends Task {
         title = "ServiceNow domain",
         description = "Subdomain used to build `https://<domain>.service-now.com/`; do not include protocol"
     )
+    @PluginProperty(group = "main")
     private Property<String> domain;
 
     @NotNull
     @Schema(title = "ServiceNow username", description = "Used with 'password' for Basic Auth or with client credentials for the OAuth password grant")
+    @PluginProperty(group = "main")
     private Property<String> username;
 
     @NotNull
     @Schema(title = "ServiceNow password", description = "Account password used with 'username' for Basic Auth or OAuth password grant")
+    @PluginProperty(group = "main")
     private Property<String> password;
 
     @Schema(title = "ServiceNow OAuth client ID", description = "Required with 'clientSecret' plus 'username' and 'password' to switch requests to OAuth bearer tokens")
+    @PluginProperty(group = "connection")
     private Property<String> clientId;
 
     @Schema(title = "ServiceNow OAuth client secret", description = "Paired with 'clientId' when using the OAuth password grant")
+    @PluginProperty(group = "connection")
     private Property<String> clientSecret;
 
     @Schema(title = "Additional request headers", description = "Optional key/value headers rendered per execution and sent with every call")
+    @PluginProperty(group = "advanced")
     protected Property<Map<CharSequence, CharSequence>> headers;
 
     @Schema(title = "HTTP client configuration", description = "Advanced HTTP settings such as timeouts, proxies, and TLS; defaults to Kestra HTTP client values")
+    @PluginProperty(group = "advanced")
     protected HttpConfiguration options;
 
     @Getter(AccessLevel.NONE)

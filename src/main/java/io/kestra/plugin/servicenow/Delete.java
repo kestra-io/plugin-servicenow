@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -27,10 +28,12 @@ public class Delete extends AbstractServiceNow implements RunnableTask<Delete.Ou
 
     @NotNull
     @Schema(title = "ServiceNow table", description = "API name of the table containing the record.")
+    @PluginProperty(group = "main")
     private Property<String> table;
 
     @NotNull
     @Schema(title = "Record sys_id", description = "Unique identifier of the record to delete.")
+    @PluginProperty(group = "main")
     private Property<String> sysId;
 
     @Override
