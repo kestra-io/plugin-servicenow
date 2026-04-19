@@ -7,8 +7,9 @@
 
 ## Why
 
-- This plugin integrates Kestra with ServiceNow.
-- It provides tasks that create, update, read, and delete ServiceNow records via REST.
+- What user problem does this solve? Teams need to create, update, read, and delete ServiceNow records via REST from orchestrated workflows instead of relying on manual console work, ad hoc scripts, or disconnected schedulers.
+- Why would a team adopt this plugin in a workflow? It keeps ServiceNow steps in the same Kestra flow as upstream preparation, approvals, retries, notifications, and downstream systems.
+- What operational/business outcome does it enable? It reduces manual handoffs and fragmented tooling while improving reliability, traceability, and delivery speed for processes that depend on ServiceNow.
 
 ## How
 
