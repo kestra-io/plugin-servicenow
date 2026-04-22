@@ -52,7 +52,7 @@ import io.kestra.core.models.annotations.PluginProperty;
                     type: io.kestra.plugin.servicenow.Get
                     domain: "snow_domain"
                     username: "snow_username"
-                    password: "snow_password"
+                    password: "{{ secret('SNOW_PASSWORD') }}"
                     table: incident
                 """
         ),
@@ -68,9 +68,9 @@ import io.kestra.core.models.annotations.PluginProperty;
                     type: io.kestra.plugin.servicenow.Get
                     domain: "snow_domain"
                     username: "snow_username"
-                    password: "snow_password"
-                    clientId: "my_registered_kestra_application_client_id"
-                    clientSecret: "my_registered_kestra_application_client_secret"
+                    password: "{{ secret('SNOW_PASSWORD') }}"
+                    clientId: "{{ secret('SNOW_CLIENT_ID') }}"
+                    clientSecret: "{{ secret('SNOW_CLIENT_SECRET') }}"
                     table: incident
                 """
         ),

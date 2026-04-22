@@ -47,12 +47,12 @@ public abstract class AbstractServiceNow extends Task {
 
     @NotNull
     @Schema(title = "ServiceNow username", description = "Used with 'password' for Basic Auth or with client credentials for the OAuth password grant")
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "main", secret = true)
     private Property<String> username;
 
     @NotNull
     @Schema(title = "ServiceNow password", description = "Account password used with 'username' for Basic Auth or OAuth password grant")
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "main", secret = true)
     private Property<String> password;
 
     @Schema(title = "ServiceNow OAuth client ID", description = "Required with 'clientSecret' plus 'username' and 'password' to switch requests to OAuth bearer tokens")
@@ -60,7 +60,7 @@ public abstract class AbstractServiceNow extends Task {
     private Property<String> clientId;
 
     @Schema(title = "ServiceNow OAuth client secret", description = "Paired with 'clientId' when using the OAuth password grant")
-    @PluginProperty(group = "connection")
+    @PluginProperty(group = "connection", secret = true)
     private Property<String> clientSecret;
 
     @Schema(title = "Additional request headers", description = "Optional key/value headers rendered per execution and sent with every call")
