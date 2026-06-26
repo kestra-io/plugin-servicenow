@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
@@ -22,6 +24,29 @@ import io.kestra.core.models.annotations.PluginProperty;
 @NoArgsConstructor
 @Schema(
     title = "Update a ServiceNow record by sys_id", description = "Issues a PUT to the table REST API to change fields on the specified record using Basic Auth or the OAuth password grant."
+)
+@Plugin(
+    examples = {
+        @Example(
+            title = "Update a ServiceNow record",
+            full = true,
+            code = """
+                id: servicenow_update
+                namespace: company.team
+
+                tasks:
+                  - id: update
+                    type: io.kestra.plugin.servicenow.Update
+                    domain: "snow_domain"
+                    username: "snow_username"
+                    password: "{{ secret('SNOW_PASSWORD') }}"
+                    table: incident
+                    sysId: "a7ec77cbdefac300d322d182689619dc"
+                    data:
+                      short_description: "Updated via Kestra"
+                """
+        )
+    }
 )
 public class Update extends AbstractServiceNow implements RunnableTask<Update.Output> {
 
@@ -64,6 +89,7 @@ public class Update extends AbstractServiceNow implements RunnableTask<Update.Ou
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "The updated record returned by ServiceNow")
         private Map<String, Object> result;
     }
 
