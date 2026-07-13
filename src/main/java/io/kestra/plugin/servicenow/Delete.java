@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
@@ -23,6 +25,27 @@ import io.kestra.core.models.annotations.PluginProperty;
 @Schema(
     title = "Delete a ServiceNow record by sys_id",
     description = "Calls the table REST API with DELETE using Basic Auth or the OAuth password grant and flags success when ServiceNow returns HTTP 204."
+)
+@Plugin(
+    examples = {
+        @Example(
+            title = "Delete a ServiceNow record",
+            full = true,
+            code = """
+                id: servicenow_delete
+                namespace: company.team
+
+                tasks:
+                  - id: delete
+                    type: io.kestra.plugin.servicenow.Delete
+                    domain: "snow_domain"
+                    username: "snow_username"
+                    password: "{{ secret('SNOW_PASSWORD') }}"
+                    table: incident
+                    sysId: "a7ec77cbdefac300d322d182689619dc"
+                """
+        )
+    }
 )
 public class Delete extends AbstractServiceNow implements RunnableTask<Delete.Output> {
 
@@ -55,6 +78,7 @@ public class Delete extends AbstractServiceNow implements RunnableTask<Delete.Ou
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "Whether the record was deleted")
         private boolean deleted;
     }
 }
