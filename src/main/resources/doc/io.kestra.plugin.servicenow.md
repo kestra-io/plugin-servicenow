@@ -4,7 +4,7 @@ Read and write records in any ServiceNow table from Kestra flows.
 
 ## Authentication
 
-Set `domain` to your ServiceNow instance subdomain (no protocol, e.g. `mycompany.service-now.com`), `username`, and `password` for basic auth. For OAuth, also set `clientId` and `clientSecret` — the plugin will exchange credentials for a bearer token automatically. Store secrets in [secrets](https://kestra.io/docs/concepts/secret) and apply connection properties globally with [plugin defaults](https://kestra.io/docs/workflow-components/plugin-defaults).
+Set `domain` to your ServiceNow instance subdomain (no protocol, e.g. `mycompany.service-now.com`), `username`, and `password` for basic auth. For OAuth, also set `clientId` and `clientSecret` — the plugin will exchange credentials for a bearer token automatically. Store secrets in [secrets](https://kestra.io/docs/concepts/secret) and set connection properties on each task.
 
 ## Tasks
 
