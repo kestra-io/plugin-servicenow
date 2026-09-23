@@ -51,7 +51,7 @@ public class Delete extends AbstractServiceNow implements RunnableTask<Delete.Ou
 
     @NotNull
     @Schema(title = "ServiceNow table", description = "API name of the table containing the record.")
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "destination")
     private Property<String> table;
 
     @NotNull

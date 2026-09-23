@@ -42,17 +42,17 @@ public abstract class AbstractServiceNow extends Task {
         title = "ServiceNow domain",
         description = "Subdomain used to build `https://<domain>.service-now.com/`; do not include protocol"
     )
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "connection")
     private Property<String> domain;
 
     @NotNull
     @Schema(title = "ServiceNow username", description = "Used with 'password' for Basic Auth or with client credentials for the OAuth password grant")
-    @PluginProperty(group = "main", secret = true)
+    @PluginProperty(group = "connection", secret = true)
     private Property<String> username;
 
     @NotNull
     @Schema(title = "ServiceNow password", description = "Account password used with 'username' for Basic Auth or OAuth password grant")
-    @PluginProperty(group = "main", secret = true)
+    @PluginProperty(group = "connection", secret = true)
     private Property<String> password;
 
     @Schema(title = "ServiceNow OAuth client ID", description = "Required with 'clientSecret' plus 'username' and 'password' to switch requests to OAuth bearer tokens")

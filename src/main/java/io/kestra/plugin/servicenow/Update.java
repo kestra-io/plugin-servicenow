@@ -52,7 +52,7 @@ public class Update extends AbstractServiceNow implements RunnableTask<Update.Ou
 
     @NotNull
     @Schema(title = "ServiceNow table", description = "API name of the table containing the record.")
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "destination")
     private Property<String> table;
 
     @NotNull
