@@ -56,12 +56,10 @@ class ServiceNowSchemaTest {
     // Dynamic-renderable non-String properties (e.g. Integer, enum, List) render as an "anyOf" of type
     // variants (typed value + Pebble expression string) instead of a flat schema, so `$group`/`$secret`
     // live on the first "anyOf" entry rather than at the top level.
-    @SuppressWarnings("unchecked")
     private static Object group(Map<String, Object> propertySchema) {
         return metadata(propertySchema).get("$group");
     }
 
-    @SuppressWarnings("unchecked")
     private static Object secret(Map<String, Object> propertySchema) {
         return metadata(propertySchema).get("$secret");
     }
