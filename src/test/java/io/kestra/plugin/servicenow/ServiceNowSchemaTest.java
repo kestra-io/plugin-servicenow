@@ -23,7 +23,7 @@ class ServiceNowSchemaTest {
     @SuppressWarnings("unchecked")
     void connectionAndDestinationPropertiesAreGrouped() {
         for (Class<? extends Task> taskClass : List.of(Post.class, Get.class, Update.class, Delete.class)) {
-            Map<String, Object> generate = jsonSchemaGenerator.properties(Task.class, taskClass);
+            var generate = jsonSchemaGenerator.properties(Task.class, taskClass);
             var properties = (Map<String, Map<String, Object>>) generate.get("properties");
 
             assertThat(group(properties.get("domain"))).isEqualTo("connection");
@@ -43,7 +43,7 @@ class ServiceNowSchemaTest {
     @Test
     @SuppressWarnings("unchecked")
     void getSpecificPropertiesAreGrouped() {
-        Map<String, Object> generate = jsonSchemaGenerator.properties(Task.class, Get.class);
+        var generate = jsonSchemaGenerator.properties(Task.class, Get.class);
         var properties = (Map<String, Map<String, Object>>) generate.get("properties");
 
         assertThat(group(properties.get("query"))).isEqualTo("main");
@@ -51,6 +51,24 @@ class ServiceNowSchemaTest {
         assertThat(group(properties.get("limit"))).isEqualTo("processing");
         assertThat(group(properties.get("offset"))).isEqualTo("processing");
         assertThat(group(properties.get("fields"))).isEqualTo("processing");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void sysIdAndDataStayInMainGroup() {
+        for (Class<? extends Task> taskClass : List.of(Update.class, Delete.class)) {
+            var generate = jsonSchemaGenerator.properties(Task.class, taskClass);
+            var properties = (Map<String, Map<String, Object>>) generate.get("properties");
+
+            assertThat(group(properties.get("sysId"))).isEqualTo("main");
+        }
+
+        for (Class<? extends Task> taskClass : List.of(Post.class, Update.class)) {
+            var generate = jsonSchemaGenerator.properties(Task.class, taskClass);
+            var properties = (Map<String, Map<String, Object>>) generate.get("properties");
+
+            assertThat(group(properties.get("data"))).isEqualTo("main");
+        }
     }
 
     // Dynamic-renderable non-String properties (e.g. Integer, enum, List) render as an "anyOf" of type
