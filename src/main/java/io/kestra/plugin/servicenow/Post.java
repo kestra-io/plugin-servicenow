@@ -82,7 +82,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
         title = "ServiceNow table",
         description = "API name of the table to insert into (for example `incident`)."
     )
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "destination")
     private Property<String> table;
 
     @NotNull

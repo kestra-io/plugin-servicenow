@@ -127,6 +127,7 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
             STORE writes all records as ION to internal storage and returns a URI.
             """
     )
+    @PluginProperty(group = "processing")
     @Builder.Default
     private Property<FetchType> fetchType = Property.ofValue(FetchType.FETCH);
 
@@ -135,31 +136,35 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
         title = "ServiceNow table",
         description = "API name of the table to query (for example `incident`)."
     )
-    @PluginProperty(group = "main")
+    @PluginProperty(group = "destination")
     private Property<String> table;
 
     @Schema(
         title = "Encoded query filter",
         description = "ServiceNow encoded query string appended as `sysparm_query` (for example `active=true^priority=1`)."
     )
+    @PluginProperty(group = "main")
     private Property<String> query;
 
     @Schema(
         title = "Maximum records to return",
         description = "Appended as `sysparm_limit`. When absent, ServiceNow applies its own default limit."
     )
+    @PluginProperty(group = "processing")
     private Property<Integer> limit;
 
     @Schema(
         title = "Starting record index",
         description = "Appended as `sysparm_offset`. Use together with `limit` for page-by-page retrieval."
     )
+    @PluginProperty(group = "processing")
     private Property<Integer> offset;
 
     @Schema(
         title = "Fields to return",
         description = "Comma-joined list of field names sent as `sysparm_fields`. When absent, all fields are returned."
     )
+    @PluginProperty(group = "processing")
     private Property<List<String>> fields;
 
     @Override
