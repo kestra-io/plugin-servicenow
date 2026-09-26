@@ -46,7 +46,7 @@ public class DeleteTest {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/"))
             .build();
 
         var output = task.run(runContext);
