@@ -5,12 +5,13 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import io.kestra.core.models.tasks.common.FetchType;
+
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.common.FetchType;
 import io.kestra.core.models.validations.ModelValidator;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
@@ -83,10 +84,8 @@ class GetTest {
 
         task.run(runContext);
 
-        verify(
-            getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
-                .withQueryParam("sysparm_query", equalTo("active=true^priority=1"))
-        );
+        verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+            .withQueryParam("sysparm_query", equalTo("active=true^priority=1")));
     }
 
     @Test
@@ -110,11 +109,9 @@ class GetTest {
 
         var output = task.run(runContext);
 
-        verify(
-            getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
-                .withQueryParam("sysparm_limit", equalTo("10"))
-                .withQueryParam("sysparm_offset", equalTo("20"))
-        );
+        verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+            .withQueryParam("sysparm_limit", equalTo("10"))
+            .withQueryParam("sysparm_offset", equalTo("20")));
 
         assertThat(output.getOffset(), is(20));
     }
@@ -139,10 +136,8 @@ class GetTest {
 
         task.run(runContext);
 
-        verify(
-            getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
-                .withQueryParam("sysparm_fields", equalTo("number,short_description"))
-        );
+        verify(getRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+            .withQueryParam("sysparm_fields", equalTo("number,short_description")));
     }
 
     @Test
@@ -207,10 +202,11 @@ class GetTest {
             .password(Property.ofValue("password"))
             .build();
 
-        assertThrows(
+        var exception = assertThrows(
             IllegalArgumentException.class,
             () -> task.run(runContext)
         );
+        assertThat(exception.getMessage(), is("Either 'domain' or 'uri' must be provided."));
     }
 
     static final String DATA = """

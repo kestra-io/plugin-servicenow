@@ -17,7 +17,6 @@ import io.kestra.core.http.client.HttpClientException;
 import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.BasicAuthConfiguration;
 import io.kestra.core.http.client.configurations.HttpConfiguration;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -26,6 +25,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -72,7 +72,7 @@ public abstract class AbstractServiceNow extends Task {
 
     @Schema(
         title = "ServiceNow base URI",
-        description = "Optional base URL override for custom or mock ServiceNow instances; defaults to `https://<domain>.service-now.com/` when not set"
+        description = "Optional base URL override for custom or mock ServiceNow instances; defaults to `https://<domain>.service-now.com/` when not set. Takes precedence over `domain`."
     )
     @PluginProperty(group = "connection")
     private Property<String> uri;
