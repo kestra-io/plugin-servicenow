@@ -37,10 +37,9 @@ public abstract class AbstractServiceNow extends Task {
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         .registerModule(new JavaTimeModule());
 
-    @NotNull
     @Schema(
         title = "ServiceNow domain",
-        description = "Subdomain used to build `https://<domain>.service-now.com/`; do not include protocol"
+        description = "Subdomain used to build `https://<domain>.service-now.com/`; do not include protocol. Required unless `uri` is set."
     )
     @PluginProperty(group = "connection")
     private Property<String> domain;
@@ -71,17 +70,24 @@ public abstract class AbstractServiceNow extends Task {
     @PluginProperty(group = "advanced")
     protected HttpConfiguration options;
 
+    @Schema(
+        title = "ServiceNow base URI",
+        description = "Optional base URL override for custom or mock ServiceNow instances; defaults to `https://<domain>.service-now.com/` when not set. Takes precedence over `domain`."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> uri;
+
     @Getter(AccessLevel.NONE)
     private transient String token;
 
-    @Getter(AccessLevel.NONE)
-    private transient String uri;
-
     protected String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
-        if (this.uri != null) {
-            return this.uri;
+        var rUri = runContext.render(this.uri).as(String.class).orElse(null);
+        if (rUri != null) {
+            return rUri.endsWith("/") ? rUri : rUri + "/";
         }
-        return "https://" + runContext.render(this.domain).as(String.class).orElseThrow() + ".service-now.com/";
+        var rDomain = runContext.render(this.domain).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("Either 'domain' or 'uri' must be provided."));
+        return "https://" + rDomain + ".service-now.com/";
     }
 
     private String token(RunContext runContext) throws IllegalVariableEvaluationException, HttpClientException {

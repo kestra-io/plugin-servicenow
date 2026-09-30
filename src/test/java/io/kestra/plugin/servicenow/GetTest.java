@@ -12,14 +12,17 @@ import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.models.validations.ModelValidator;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.serializers.JacksonMapper;
 
 import jakarta.inject.Inject;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
 @WireMockTest(httpPort = 8081)
@@ -27,6 +30,9 @@ class GetTest {
 
     @Inject
     private RunContextFactory runContextFactory;
+
+    @Inject
+    private ModelValidator modelValidator;
 
     @Test
     void run(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
@@ -48,7 +54,7 @@ class GetTest {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/") //Used only for testing
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")) //Used only for testing
             .build();
 
         var output = task.run(runContext);
@@ -72,7 +78,7 @@ class GetTest {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/"))
             .query(Property.ofValue("active=true^priority=1"))
             .build();
 
@@ -96,7 +102,7 @@ class GetTest {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/"))
             .limit(Property.ofValue(10))
             .offset(Property.ofValue(20))
             .build();
@@ -124,7 +130,7 @@ class GetTest {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/"))
             .fields(Property.ofValue(List.of("number", "short_description")))
             .build();
 
@@ -148,7 +154,7 @@ class GetTest {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/"))
             .fetchType(Property.ofValue(FetchType.STORE))
             .build();
 
@@ -157,6 +163,50 @@ class GetTest {
         assertThat(output.getUri() != null, is(true));
         assertThat(output.getResults() == null, is(true));
         assertThat(output.getSize(), is(1));
+    }
+
+    @Test
+    void runFromYamlWithCustomUri(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+        stubFor(any(urlPathEqualTo("/service-now.com/api/now/table/incident")).willReturn(okJson(DATA)));
+        stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
+
+        var yaml = """
+            id: get_incidents
+            type: io.kestra.plugin.servicenow.Get
+            uri: %s/service-now.com
+            username: username
+            password: password
+            clientId: clientId
+            clientSecret: clientSecret
+            table: incident
+            """.formatted(wireMockRuntimeInfo.getHttpBaseUrl());
+
+        var task = JacksonMapper.ofYaml().readValue(yaml, Get.class);
+        assertThat(modelValidator.isValid(task).isEmpty(), is(true));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var output = task.run(runContext);
+
+        assertThat(output.getSize(), is(1));
+        assertThat(output.getResults().getFirst().get("number"), is("PRB0000050"));
+    }
+
+    @Test
+    void missingDomainAndUriThrowsException() {
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Get.builder()
+            .table(Property.ofValue("incident"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .build();
+
+        var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> task.run(runContext)
+        );
+        assertThat(exception.getMessage(), is("Either 'domain' or 'uri' must be provided."));
     }
 
     static final String DATA = """

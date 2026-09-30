@@ -27,6 +27,7 @@ class ServiceNowSchemaTest {
             var properties = (Map<String, Map<String, Object>>) generate.get("properties");
 
             assertThat(group(properties.get("domain"))).isEqualTo("connection");
+            assertThat(group(properties.get("uri"))).isEqualTo("connection");
             assertThat(group(properties.get("username"))).isEqualTo("connection");
             assertThat(group(properties.get("password"))).isEqualTo("connection");
             assertThat(group(properties.get("clientId"))).isEqualTo("connection");

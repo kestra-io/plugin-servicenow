@@ -46,7 +46,7 @@ class PostTests {
             .username(Property.ofValue("username"))
             .password(Property.ofValue("password"))
             .domain(Property.ofValue("kestra"))
-            .uri(wmRuntimeInfo.getHttpBaseUrl() + "/service-now.com/") //Used only for testing
+            .uri(Property.ofValue(wmRuntimeInfo.getHttpBaseUrl() + "/service-now.com/")) //Used only for testing
             .build();
 
         var output = task.run(runContext);
