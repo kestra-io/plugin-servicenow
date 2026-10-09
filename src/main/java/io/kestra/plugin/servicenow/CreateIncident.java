@@ -48,7 +48,7 @@ import lombok.experimental.SuperBuilder;
         )
     }
 )
-public class CreateIncident extends AbstractServiceNow implements RunnableTask<Post.Output>, TicketingTaskInterface {
+public class CreateIncident extends AbstractServiceNow implements RunnableTask<CreatedRecord>, TicketingTaskInterface {
     private static final String TABLE = "incident";
 
     @NotNull
@@ -67,16 +67,26 @@ public class CreateIncident extends AbstractServiceNow implements RunnableTask<P
     @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {"CRITICAL=1", "HIGH=1", "MEDIUM=2", "LOW=3"})
     private Property<String> urgency;
 
+    @Schema(title = "Impact", description = "`1` (high), `2` (medium) or `3` (low); with the urgency it sets the incident priority. Leave blank to use the ServiceNow default.")
+    @PluginProperty(group = "advanced")
+    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {"CRITICAL=1", "HIGH=2", "MEDIUM=2", "LOW=3"})
+    private Property<String> impact;
+
     @Schema(title = "Additional fields", description = "Any other incident fields, merged into the request body; the typed fields above take precedence.")
     @PluginProperty(group = "advanced")
     private Property<Map<String, Object>> data;
 
     @Override
-    public Post.Output run(RunContext runContext) throws Exception {
+    public CreatedRecord run(RunContext runContext) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>(runContext.render(data).asMap(String.class, Object.class));
-        body.put("short_description", runContext.render(shortDescription).as(String.class).orElseThrow());
-        runContext.render(incidentDescription).as(String.class).ifPresent(value -> body.put("description", value));
-        runContext.render(urgency).as(String.class).ifPresent(value -> body.put("urgency", value));
+        body.put(
+            "short_description",
+            runContext.render(shortDescription).as(String.class)
+                .orElseThrow(() -> new IllegalArgumentException("ServiceNow 'shortDescription' is required to create an incident."))
+        );
+        runContext.render(incidentDescription).as(String.class).filter(value -> !value.isBlank()).ifPresent(value -> body.put("description", value));
+        runContext.render(urgency).as(String.class).filter(value -> !value.isBlank()).ifPresent(value -> body.put("urgency", value));
+        runContext.render(impact).as(String.class).filter(value -> !value.isBlank()).ifPresent(value -> body.put("impact", value));
 
         return createRecord(runContext, TABLE, body);
     }

@@ -13,7 +13,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.annotations.TicketingField;
 
 @SuperBuilder
 @ToString
@@ -72,7 +71,7 @@ import io.kestra.core.models.annotations.TicketingField;
         )
     }
 )
-public class Post extends AbstractServiceNow implements RunnableTask<Post.Output> {
+public class Post extends AbstractServiceNow implements RunnableTask<CreatedRecord> {
     @NotNull
     @Schema(
         title = "ServiceNow table",
@@ -90,47 +89,11 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     private Property<Map<String, Object>> data;
 
     @Override
-    public Post.Output run(RunContext runContext) throws Exception {
+    public CreatedRecord run(RunContext runContext) throws Exception {
         return createRecord(
             runContext,
             runContext.render(this.table).as(String.class).orElseThrow(),
             runContext.render(data).asMap(String.class, Object.class)
         );
-    }
-
-    @Builder
-    @Getter
-    public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(
-            title = "Created record",
-            description = "ServiceNow response for the inserted row."
-        )
-        private Map<String, Object> result;
-
-        @Schema(
-            title = "Record number",
-            description = "Human-readable number of the created record, such as `INC0010002`. Empty for tables that have no `number` field."
-        )
-        @TicketingField(role = TicketingField.Role.TICKET_KEY)
-        private String number;
-
-        @Schema(
-            title = "Record sys_id",
-            description = "Unique identifier of the created record; pass it to `Update`, `Get` or `Delete`."
-        )
-        private String sysId;
-
-        @Schema(
-            title = "Record URL",
-            description = "Link that opens the created record in the ServiceNow UI."
-        )
-        @TicketingField(role = TicketingField.Role.TICKET_URL)
-        private String url;
-    }
-
-    @Data
-    @NoArgsConstructor
-    public static class PostResult {
-        Map<String, Object> result;
     }
 }

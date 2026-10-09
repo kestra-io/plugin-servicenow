@@ -80,7 +80,7 @@ public abstract class AbstractServiceNow extends Task {
     @Getter(AccessLevel.NONE)
     private transient String token;
 
-    protected Post.Output createRecord(RunContext runContext, String table, Map<String, Object> data) throws Exception {
+    protected CreatedRecord createRecord(RunContext runContext, String table, Map<String, Object> data) throws Exception {
         String baseUri = baseUri(runContext);
 
         HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
@@ -88,23 +88,29 @@ public abstract class AbstractServiceNow extends Task {
             .method("POST")
             .body(HttpRequest.JsonRequestBody.builder().content(data).build());
 
-        HttpResponse<Post.PostResult> response = this.request(runContext, requestBuilder, Post.PostResult.class);
+        HttpResponse<RecordResponse> response = this.request(runContext, requestBuilder, RecordResponse.class);
 
         if (response.getBody() == null) {
             throw new IllegalStateException("Empty body on '" + response + "'");
         }
 
-        runContext.logger().info("Post done with result '{}'", response.getBody());
+        runContext.logger().info("Created a record in '{}': '{}'", table, response.getBody());
 
         Map<String, Object> result = response.getBody().getResult();
         String sysId = stringValue(result, "sys_id");
 
-        return Post.Output.builder()
+        return CreatedRecord.builder()
             .result(result)
             .number(stringValue(result, "number"))
             .sysId(sysId)
             .url(sysId == null ? null : baseUri + table + ".do?sys_id=" + sysId)
             .build();
+    }
+
+    @Data
+    @NoArgsConstructor
+    public static class RecordResponse {
+        Map<String, Object> result;
     }
 
     private static String stringValue(Map<String, Object> result, String field) {
