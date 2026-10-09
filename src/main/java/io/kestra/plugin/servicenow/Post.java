@@ -1,17 +1,11 @@
 package io.kestra.plugin.servicenow;
 
-import java.net.URI;
 import java.util.Map;
 
-import org.slf4j.Logger;
-
-import io.kestra.core.http.HttpRequest;
-import io.kestra.core.http.HttpResponse;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.TicketingTaskInterface;
 import io.kestra.core.runners.RunContext;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -78,14 +72,13 @@ import io.kestra.core.models.annotations.TicketingField;
         )
     }
 )
-public class Post extends AbstractServiceNow implements RunnableTask<Post.Output>, TicketingTaskInterface {
+public class Post extends AbstractServiceNow implements RunnableTask<Post.Output> {
     @NotNull
     @Schema(
         title = "ServiceNow table",
         description = "API name of the table to insert into (for example `incident`)."
     )
     @PluginProperty(group = "destination")
-    @TicketingField(defaultValue = "incident")
     private Property<String> table;
 
     @NotNull
@@ -98,43 +91,11 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
 
     @Override
     public Post.Output run(RunContext runContext) throws Exception {
-        Logger logger = runContext.logger();
-
-        String rTable = runContext.render(this.table).as(String.class).orElseThrow();
-        String baseUri = baseUri(runContext);
-
-        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
-            .uri(URI.create(baseUri + "api/now/table/" + rTable))
-            .method("POST")
-            .body(
-                HttpRequest.JsonRequestBody.builder()
-                    .content(runContext.render(data).asMap(String.class, Object.class))
-                    .build()
-            );
-
-        HttpResponse<PostResult> response = this.request(runContext, requestBuilder, PostResult.class);
-
-        if (response.getBody() == null) {
-            throw new IllegalStateException("Empty body on '" + response + "'");
-        }
-
-        logger.info("Post done with result '{}'", response.getBody());
-
-        Map<String, Object> result = response.getBody().getResult();
-        String number = stringValue(result, "number");
-        String sysId = stringValue(result, "sys_id");
-
-        return Output.builder()
-            .result(result)
-            .number(number)
-            .sysId(sysId)
-            .url(sysId == null ? null : baseUri + rTable + ".do?sys_id=" + sysId)
-            .build();
-    }
-
-    private static String stringValue(Map<String, Object> result, String field) {
-        Object value = result == null ? null : result.get(field);
-        return value instanceof String text && !text.isBlank() ? text : null;
+        return createRecord(
+            runContext,
+            runContext.render(this.table).as(String.class).orElseThrow(),
+            runContext.render(data).asMap(String.class, Object.class)
+        );
     }
 
     @Builder

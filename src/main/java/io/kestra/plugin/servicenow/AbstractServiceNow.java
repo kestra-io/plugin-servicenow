@@ -80,6 +80,38 @@ public abstract class AbstractServiceNow extends Task {
     @Getter(AccessLevel.NONE)
     private transient String token;
 
+    protected Post.Output createRecord(RunContext runContext, String table, Map<String, Object> data) throws Exception {
+        String baseUri = baseUri(runContext);
+
+        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
+            .uri(URI.create(baseUri + "api/now/table/" + table))
+            .method("POST")
+            .body(HttpRequest.JsonRequestBody.builder().content(data).build());
+
+        HttpResponse<Post.PostResult> response = this.request(runContext, requestBuilder, Post.PostResult.class);
+
+        if (response.getBody() == null) {
+            throw new IllegalStateException("Empty body on '" + response + "'");
+        }
+
+        runContext.logger().info("Post done with result '{}'", response.getBody());
+
+        Map<String, Object> result = response.getBody().getResult();
+        String sysId = stringValue(result, "sys_id");
+
+        return Post.Output.builder()
+            .result(result)
+            .number(stringValue(result, "number"))
+            .sysId(sysId)
+            .url(sysId == null ? null : baseUri + table + ".do?sys_id=" + sysId)
+            .build();
+    }
+
+    private static String stringValue(Map<String, Object> result, String field) {
+        Object value = result == null ? null : result.get(field);
+        return value instanceof String text && !text.isBlank() ? text : null;
+    }
+
     protected String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
         var rUri = runContext.render(this.uri).as(String.class).orElse(null);
         if (rUri != null) {
