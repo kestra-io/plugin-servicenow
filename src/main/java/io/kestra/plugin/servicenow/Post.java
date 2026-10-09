@@ -98,8 +98,11 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     public Post.Output run(RunContext runContext) throws Exception {
         Logger logger = runContext.logger();
 
+        String rTable = runContext.render(this.table).as(String.class).orElseThrow();
+        String baseUri = baseUri(runContext);
+
         HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
-            .uri(URI.create(baseUri(runContext) + "api/now/table/" + runContext.render(this.table).as(String.class).orElseThrow()))
+            .uri(URI.create(baseUri + "api/now/table/" + rTable))
             .method("POST")
             .body(
                 HttpRequest.JsonRequestBody.builder()
@@ -115,9 +118,21 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
 
         logger.info("Post done with result '{}'", response.getBody());
 
+        Map<String, Object> result = response.getBody().getResult();
+        String number = stringValue(result, "number");
+        String sysId = stringValue(result, "sys_id");
+
         return Output.builder()
-            .result(response.getBody().getResult())
+            .result(result)
+            .number(number)
+            .sysId(sysId)
+            .url(sysId == null ? null : baseUri + rTable + ".do?sys_id=" + sysId)
             .build();
+    }
+
+    private static String stringValue(Map<String, Object> result, String field) {
+        Object value = result == null ? null : result.get(field);
+        return value instanceof String text && !text.isBlank() ? text : null;
     }
 
     @Builder
@@ -128,6 +143,24 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
             description = "ServiceNow response for the inserted row."
         )
         private Map<String, Object> result;
+
+        @Schema(
+            title = "Record number",
+            description = "Human-readable number of the created record, such as `INC0010002`. Empty for tables that have no `number` field."
+        )
+        private String number;
+
+        @Schema(
+            title = "Record sys_id",
+            description = "Unique identifier of the created record; pass it to `Update`, `Get` or `Delete`."
+        )
+        private String sysId;
+
+        @Schema(
+            title = "Record URL",
+            description = "Link that opens the created record in the ServiceNow UI."
+        )
+        private String url;
     }
 
     @Data
