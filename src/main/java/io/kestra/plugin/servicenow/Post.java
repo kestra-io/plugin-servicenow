@@ -19,6 +19,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.annotations.TicketingField;
 
 @SuperBuilder
 @ToString
@@ -84,6 +85,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
         description = "API name of the table to insert into (for example `incident`)."
     )
     @PluginProperty(group = "destination")
+    @TicketingField(defaultValue = "incident")
     private Property<String> table;
 
     @NotNull
@@ -148,6 +150,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
             title = "Record number",
             description = "Human-readable number of the created record, such as `INC0010002`. Empty for tables that have no `number` field."
         )
+        @TicketingField(role = TicketingField.Role.TICKET_KEY)
         private String number;
 
         @Schema(
@@ -160,6 +163,7 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
             title = "Record URL",
             description = "Link that opens the created record in the ServiceNow UI."
         )
+        @TicketingField(role = TicketingField.Role.TICKET_URL)
         private String url;
     }
 
