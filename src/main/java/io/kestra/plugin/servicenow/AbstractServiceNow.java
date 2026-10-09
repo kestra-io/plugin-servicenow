@@ -91,7 +91,7 @@ public abstract class AbstractServiceNow extends Task {
         HttpResponse<RecordResponse> response = this.request(runContext, requestBuilder, RecordResponse.class);
 
         if (response.getBody() == null) {
-            throw new IllegalStateException("Empty body on '" + response + "'");
+            throw new IllegalStateException("The ServiceNow response has an empty body (status %d).".formatted(response.getStatus().getCode()));
         }
 
         runContext.logger().info("Created a record in '{}': '{}'", table, response.getBody());

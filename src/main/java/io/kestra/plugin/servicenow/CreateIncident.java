@@ -64,12 +64,12 @@ public class CreateIncident extends AbstractServiceNow implements RunnableTask<C
 
     @Schema(title = "Urgency", description = "`1` (high), `2` (medium) or `3` (low). Leave blank to use the ServiceNow default.")
     @PluginProperty(group = "advanced")
-    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {"CRITICAL=1", "HIGH=1", "MEDIUM=2", "LOW=3"})
+    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {@TicketingField.Mapping(from = "CRITICAL", to = "1"), @TicketingField.Mapping(from = "HIGH", to = "1"), @TicketingField.Mapping(from = "MEDIUM", to = "2"), @TicketingField.Mapping(from = "LOW", to = "3")})
     private Property<String> urgency;
 
     @Schema(title = "Impact", description = "`1` (high), `2` (medium) or `3` (low); with the urgency it sets the incident priority. Leave blank to use the ServiceNow default.")
     @PluginProperty(group = "advanced")
-    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {"CRITICAL=1", "HIGH=2", "MEDIUM=2", "LOW=3"})
+    @TicketingField(role = TicketingField.Role.CASE_SEVERITY, valueMap = {@TicketingField.Mapping(from = "CRITICAL", to = "1"), @TicketingField.Mapping(from = "HIGH", to = "2"), @TicketingField.Mapping(from = "MEDIUM", to = "2"), @TicketingField.Mapping(from = "LOW", to = "3")})
     private Property<String> impact;
 
     @Schema(title = "Additional fields", description = "Any other incident fields, merged into the request body; the typed fields above take precedence.")

@@ -183,7 +183,7 @@ public class Get extends AbstractServiceNow implements RunnableTask<Get.Output> 
         var response = this.request(runContext, requestBuilder, GetResult.class);
 
         if (response.getBody() == null) {
-            throw new IllegalStateException("Empty body on '" + response + "'");
+            throw new IllegalStateException("The ServiceNow response has an empty body (status %d).".formatted(response.getStatus().getCode()));
         }
 
         logger.info("Get done with result '{}'", response.getBody());

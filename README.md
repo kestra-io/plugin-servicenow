@@ -46,7 +46,7 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.servicenow`.
-- Includes classes such as `Delete`, `Update`, `Post`, `Get`.
+- Includes classes such as `Delete`, `Update`, `Post`, `CreateIncident`, `Get`.
 
 ## Documentation
 
