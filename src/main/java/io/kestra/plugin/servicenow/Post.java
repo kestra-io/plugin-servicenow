@@ -1,17 +1,11 @@
 package io.kestra.plugin.servicenow;
 
-import java.net.URI;
 import java.util.Map;
 
-import org.slf4j.Logger;
-
-import io.kestra.core.http.HttpRequest;
-import io.kestra.core.http.HttpResponse;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.TicketingTaskInterface;
 import io.kestra.core.runners.RunContext;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -77,7 +71,7 @@ import io.kestra.core.models.annotations.PluginProperty;
         )
     }
 )
-public class Post extends AbstractServiceNow implements RunnableTask<Post.Output>, TicketingTaskInterface {
+public class Post extends AbstractServiceNow implements RunnableTask<CreatedRecord> {
     @NotNull
     @Schema(
         title = "ServiceNow table",
@@ -95,77 +89,11 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     private Property<Map<String, Object>> data;
 
     @Override
-    public Post.Output run(RunContext runContext) throws Exception {
-        Logger logger = runContext.logger();
-
-        String rTable = runContext.render(this.table).as(String.class).orElseThrow();
-        String baseUri = baseUri(runContext);
-
-        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
-            .uri(URI.create(baseUri + "api/now/table/" + rTable))
-            .method("POST")
-            .body(
-                HttpRequest.JsonRequestBody.builder()
-                    .content(runContext.render(data).asMap(String.class, Object.class))
-                    .build()
-            );
-
-        HttpResponse<PostResult> response = this.request(runContext, requestBuilder, PostResult.class);
-
-        if (response.getBody() == null) {
-            throw new IllegalStateException("Empty body on '" + response + "'");
-        }
-
-        logger.info("Post done with result '{}'", response.getBody());
-
-        Map<String, Object> result = response.getBody().getResult();
-        String number = stringValue(result, "number");
-        String sysId = stringValue(result, "sys_id");
-
-        return Output.builder()
-            .result(result)
-            .number(number)
-            .sysId(sysId)
-            .url(sysId == null ? null : baseUri + rTable + ".do?sys_id=" + sysId)
-            .build();
-    }
-
-    private static String stringValue(Map<String, Object> result, String field) {
-        Object value = result == null ? null : result.get(field);
-        return value instanceof String text && !text.isBlank() ? text : null;
-    }
-
-    @Builder
-    @Getter
-    public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(
-            title = "Created record",
-            description = "ServiceNow response for the inserted row."
-        )
-        private Map<String, Object> result;
-
-        @Schema(
-            title = "Record number",
-            description = "Human-readable number of the created record, such as `INC0010002`. Empty for tables that have no `number` field."
-        )
-        private String number;
-
-        @Schema(
-            title = "Record sys_id",
-            description = "Unique identifier of the created record; pass it to `Update`, `Get` or `Delete`."
-        )
-        private String sysId;
-
-        @Schema(
-            title = "Record URL",
-            description = "Link that opens the created record in the ServiceNow UI."
-        )
-        private String url;
-    }
-
-    @Data
-    @NoArgsConstructor
-    public static class PostResult {
-        Map<String, Object> result;
+    public CreatedRecord run(RunContext runContext) throws Exception {
+        return createRecord(
+            runContext,
+            runContext.render(this.table).as(String.class).orElseThrow(),
+            runContext.render(data).asMap(String.class, Object.class)
+        );
     }
 }

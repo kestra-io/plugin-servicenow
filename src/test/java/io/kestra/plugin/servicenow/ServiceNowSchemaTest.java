@@ -43,6 +43,20 @@ class ServiceNowSchemaTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void createIncidentConnectionAndTicketFieldsAreGrouped() {
+        var generate = jsonSchemaGenerator.properties(Task.class, CreateIncident.class);
+        var properties = (Map<String, Map<String, Object>>) generate.get("properties");
+
+        assertThat(group(properties.get("domain"))).isEqualTo("connection");
+        assertThat(group(properties.get("username"))).isEqualTo("connection");
+        assertThat(group(properties.get("password"))).isEqualTo("connection");
+        assertThat(secret(properties.get("password"))).isEqualTo(true);
+        assertThat(group(properties.get("shortDescription"))).isEqualTo("main");
+        assertThat(group(properties.get("incidentDescription"))).isEqualTo("main");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void getSpecificPropertiesAreGrouped() {
         var generate = jsonSchemaGenerator.properties(Task.class, Get.class);
         var properties = (Map<String, Map<String, Object>>) generate.get("properties");
