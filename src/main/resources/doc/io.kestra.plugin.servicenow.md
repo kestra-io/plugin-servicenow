@@ -12,6 +12,8 @@ Set `domain` to your ServiceNow instance subdomain (no protocol, e.g. `mycompany
 
 `Post` creates a record in a `table` — set `data` as a map of field names to values.
 
+`CreateIncident` creates an `incident` from typed `shortDescription`, `incidentDescription`, `urgency` and `impact`, plus any extra fields in `data`.
+
 `Update` updates a record by `sysId` in a `table` — set `data` with the fields to change.
 
 `Delete` removes a record by `sysId` from a `table`.
