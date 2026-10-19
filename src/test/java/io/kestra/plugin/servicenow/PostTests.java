@@ -53,6 +53,9 @@ class PostTests {
 
         assertThat(output.getResult().size(), is(82));
         assertThat(output.getResult().get("number"), is("INC0010002"));
+        assertThat(output.getNumber(), is("INC0010002"));
+        assertThat(output.getSysId(), is("c537bae64f411200adf9f8e18110c76e"));
+        assertThat(output.getUrl(), is(wmRuntimeInfo.getHttpBaseUrl() + "/service-now.com/fakeTableName.do?sys_id=c537bae64f411200adf9f8e18110c76e"));
     }
 
     static final String DATA = """
