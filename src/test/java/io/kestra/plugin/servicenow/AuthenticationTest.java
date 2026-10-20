@@ -127,7 +127,7 @@ class AuthenticationTest {
             .options(options)
             .build();
 
-        for (String user : new String[] { "alice", "bob" }) {
+        for (var user : new String[] { "alice", "bob" }) {
             stubFor(
                 get(urlPathEqualTo("/api/now/table/incident"))
                     .withBasicAuth(user, user + "-password")

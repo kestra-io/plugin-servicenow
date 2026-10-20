@@ -1,12 +1,7 @@
 package io.kestra.plugin.servicenow;
 
-import java.net.URI;
 import java.util.Map;
 
-import org.slf4j.Logger;
-
-import io.kestra.core.http.HttpRequest;
-import io.kestra.core.http.HttpResponse;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
@@ -76,7 +71,7 @@ import io.kestra.core.models.annotations.PluginProperty;
         )
     }
 )
-public class Post extends AbstractServiceNow implements RunnableTask<Post.Output> {
+public class Post extends AbstractServiceNow implements RunnableTask<CreatedRecord> {
     @NotNull
     @Schema(
         title = "ServiceNow table",
@@ -94,44 +89,11 @@ public class Post extends AbstractServiceNow implements RunnableTask<Post.Output
     private Property<Map<String, Object>> data;
 
     @Override
-    public Post.Output run(RunContext runContext) throws Exception {
-        Logger logger = runContext.logger();
-
-        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
-            .uri(URI.create(baseUri(runContext) + "api/now/table/" + runContext.render(this.table).as(String.class).orElseThrow()))
-            .method("POST")
-            .body(
-                HttpRequest.JsonRequestBody.builder()
-                    .content(runContext.render(data).asMap(String.class, Object.class))
-                    .build()
-            );
-
-        HttpResponse<PostResult> response = this.request(runContext, requestBuilder, PostResult.class);
-
-        if (response.getBody() == null) {
-            throw new IllegalStateException("Empty body on '" + response + "'");
-        }
-
-        logger.info("Post done with result '{}'", response.getBody());
-
-        return Output.builder()
-            .result(response.getBody().getResult())
-            .build();
-    }
-
-    @Builder
-    @Getter
-    public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(
-            title = "Created record",
-            description = "ServiceNow response for the inserted row."
-        )
-        private Map<String, Object> result;
-    }
-
-    @Data
-    @NoArgsConstructor
-    public static class PostResult {
-        Map<String, Object> result;
+    public CreatedRecord run(RunContext runContext) throws Exception {
+        return createRecord(
+            runContext,
+            runContext.render(this.table).as(String.class).orElseThrow(),
+            runContext.render(data).asMap(String.class, Object.class)
+        );
     }
 }

@@ -77,6 +77,44 @@ public abstract class AbstractServiceNow extends Task {
     @PluginProperty(group = "connection")
     private Property<String> uri;
 
+    protected CreatedRecord createRecord(RunContext runContext, String table, Map<String, Object> data) throws Exception {
+        String baseUri = baseUri(runContext);
+
+        HttpRequest.HttpRequestBuilder requestBuilder = HttpRequest.builder()
+            .uri(URI.create(baseUri + "api/now/table/" + table))
+            .method("POST")
+            .body(HttpRequest.JsonRequestBody.builder().content(data).build());
+
+        HttpResponse<RecordResponse> response = this.request(runContext, requestBuilder, RecordResponse.class);
+
+        if (response.getBody() == null) {
+            throw new IllegalStateException("The ServiceNow response has an empty body (status %d).".formatted(response.getStatus().getCode()));
+        }
+
+        runContext.logger().info("Created a record in '{}': '{}'", table, response.getBody());
+
+        Map<String, Object> result = response.getBody().getResult();
+        String sysId = stringValue(result, "sys_id");
+
+        return CreatedRecord.builder()
+            .result(result)
+            .number(stringValue(result, "number"))
+            .sysId(sysId)
+            .url(sysId == null ? null : baseUri + table + ".do?sys_id=" + sysId)
+            .build();
+    }
+
+    @Data
+    @NoArgsConstructor
+    public static class RecordResponse {
+        Map<String, Object> result;
+    }
+
+    private static String stringValue(Map<String, Object> result, String field) {
+        Object value = result == null ? null : result.get(field);
+        return value instanceof String text && !text.isBlank() ? text : null;
+    }
+
     protected String baseUri(RunContext runContext) throws IllegalVariableEvaluationException {
         var rUri = runContext.render(this.uri).as(String.class).orElse(null);
         if (rUri != null) {
