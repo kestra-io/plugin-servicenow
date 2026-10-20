@@ -17,6 +17,7 @@ import io.kestra.core.http.client.HttpClientException;
 import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.BasicAuthConfiguration;
 import io.kestra.core.http.client.configurations.HttpConfiguration;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -25,7 +26,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -77,9 +77,6 @@ public abstract class AbstractServiceNow extends Task {
     @PluginProperty(group = "connection")
     private Property<String> uri;
 
-    @Getter(AccessLevel.NONE)
-    private transient String token;
-
     protected CreatedRecord createRecord(RunContext runContext, String table, Map<String, Object> data) throws Exception {
         String baseUri = baseUri(runContext);
 
@@ -129,10 +126,6 @@ public abstract class AbstractServiceNow extends Task {
     }
 
     private String token(RunContext runContext) throws IllegalVariableEvaluationException, HttpClientException {
-        if (this.token != null) {
-            return this.token;
-        }
-
         URI uri = URI.create(baseUri(runContext) + "oauth_token.do");
 
         Map<String, Object> requestBody = Map.of(
@@ -171,8 +164,7 @@ public abstract class AbstractServiceNow extends Task {
             if (tokenResponse == null || !tokenResponse.containsKey("access_token")) {
                 throw new IllegalStateException("Invalid token request with response " + tokenResponse);
             }
-            this.token = tokenResponse.get("access_token");
-            return this.token;
+            return tokenResponse.get("access_token");
         } catch (IOException e) {
             throw new RuntimeException("Error fetching access token", e);
         }
@@ -185,11 +177,12 @@ public abstract class AbstractServiceNow extends Task {
             .addHeader("Content-Type", "application/json")
             .build();
 
+        var requestOptions = this.options;
         if (this.clientId != null) {
             requestBuilder.addHeader("Authorization", "Bearer " + this.token(runContext));
         } else {
             var optionsBuilder = options != null ? options.toBuilder() : HttpConfiguration.builder();
-            options = optionsBuilder.auth(
+            requestOptions = optionsBuilder.auth(
                 BasicAuthConfiguration.builder()
                     .username(this.username)
                     .password(this.password).build()
@@ -197,7 +190,7 @@ public abstract class AbstractServiceNow extends Task {
         }
 
         var request = requestBuilder.build();
-        try (HttpClient client = new HttpClient(runContext, options)) {
+        try (HttpClient client = new HttpClient(runContext, requestOptions)) {
             HttpResponse<String> response = client.request(request, String.class);
             RES parsedResponse = null;
             if (responseType != Void.class && response.getBody() != null && !response.getBody().isEmpty()) {
