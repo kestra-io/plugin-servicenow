@@ -2,6 +2,7 @@ package io.kestra.plugin.servicenow;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 
@@ -204,10 +205,20 @@ public abstract class AbstractServiceNow extends Task {
                 .status(response.getStatus())
                 .build();
         } catch (HttpClientResponseException e) {
+            var response = Objects.requireNonNull(e.getResponse());
+            Object body = response.getBody();
+            String bodyAsString;
+            if (body == null) {
+                bodyAsString = "";
+            } else if (body instanceof byte[] bytes) {
+                bodyAsString = new String(bytes, StandardCharsets.UTF_8);
+            } else {
+                bodyAsString = body.toString();
+            }
             throw new HttpClientResponseException(
-                "Request failed '" + Objects.requireNonNull(e.getResponse()).getStatus().getCode() +
-                    "' and body '" + e.getResponse().getBody() + "'",
-                e.getResponse()
+                "Request failed '" + response.getStatus().getCode() +
+                    "' and body '" + bodyAsString + "'",
+                response
             );
         } catch (IOException e) {
             throw new RuntimeException("Error parsing response body", e);
