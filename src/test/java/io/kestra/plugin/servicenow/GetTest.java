@@ -10,6 +10,7 @@ import io.kestra.core.models.tasks.common.FetchType;
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 
+import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.validations.ModelValidator;
@@ -21,6 +22,7 @@ import jakarta.inject.Inject;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.core.Is.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -190,6 +192,39 @@ class GetTest {
 
         assertThat(output.getSize(), is(1));
         assertThat(output.getResults().getFirst().get("number"), is("PRB0000050"));
+    }
+
+    @Test
+    void runWithErrorBodyShowsDecodedMessage(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+        stubFor(
+            any(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+                .willReturn(
+                    aResponse()
+                        .withStatus(401)
+                        .withBody("{\"error\":{\"message\":\"User Not Authenticated\"},\"status\":\"failure\"}")
+                )
+        );
+        stubFor(any(urlPathEqualTo("/service-now.com/oauth_token.do")).willReturn(okJson("{\"access_token\":\"token\"}")));
+
+        var runContext = runContextFactory.of(Map.of());
+
+        var task = Get.builder()
+            .table(Property.ofValue("incident"))
+            .clientId(Property.ofValue("clientId"))
+            .clientSecret(Property.ofValue("clientSecret"))
+            .username(Property.ofValue("username"))
+            .password(Property.ofValue("password"))
+            .domain(Property.ofValue("kestra"))
+            .uri(Property.ofValue(wireMockRuntimeInfo.getHttpBaseUrl() + "/service-now.com/"))
+            .query(Property.ofValue("active=true^priority=1"))
+            .build();
+
+        var exception = assertThrows(
+            HttpClientResponseException.class,
+            () -> task.run(runContext)
+        );
+        assertThat(exception.getMessage(), containsString("User Not Authenticated"));
+        assertThat(exception.getMessage().contains("[B@"), is(false));
     }
 
     @Test
