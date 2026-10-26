@@ -82,14 +82,14 @@ public class Update extends AbstractServiceNow implements RunnableTask<Update.Ou
         HttpResponse<UpdateResult> response = this.request(runContext, requestBuilder, UpdateResult.class);
 
         return Output.builder()
-            .result(response.getBody().getResult())
+            .result(response.getBody() == null ? null : response.getBody().getResult())
             .build();
     }
 
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "The updated record returned by ServiceNow")
+        @Schema(title = "The updated record returned by ServiceNow", description = "Null when ServiceNow returns no body, for example with the `X-no-response-body: true` header.")
         private Map<String, Object> result;
     }
 

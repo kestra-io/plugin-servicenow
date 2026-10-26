@@ -3,6 +3,7 @@ package io.kestra.plugin.servicenow;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -142,21 +143,7 @@ public abstract class AbstractServiceNow extends Task {
             .method("POST")
             .body(HttpRequest.UrlEncodedRequestBody.builder().content(requestBody).build());
 
-        if (this.headers != null) {
-            runContext.render(this.headers)
-                .asMap(CharSequence.class, CharSequence.class)
-                .forEach((key, value) ->
-                {
-                    try {
-                        requestBuilder.addHeader(
-                            key.toString(),
-                            runContext.render(value.toString())
-                        );
-                    } catch (IllegalVariableEvaluationException ex) {
-                        throw new RuntimeException("Failed to render header value", ex);
-                    }
-                });
-        }
+        addHeaders(runContext, requestBuilder);
 
         try (HttpClient client = new HttpClient(runContext, options)) {
             HttpResponse<Map<String, String>> exchange = client.request(requestBuilder.build());
@@ -171,12 +158,22 @@ public abstract class AbstractServiceNow extends Task {
         }
     }
 
+    private Map<String, String> addHeaders(RunContext runContext, HttpRequest.HttpRequestBuilder requestBuilder) throws IllegalVariableEvaluationException {
+        Map<String, String> rHeaders = new LinkedHashMap<>();
+        runContext.render(this.headers).asMap(CharSequence.class, CharSequence.class)
+            .forEach((key, value) -> rHeaders.put(key.toString(), value.toString()));
+        rHeaders.forEach(requestBuilder::addHeader);
+        return rHeaders;
+    }
+
     protected <RES> HttpResponse<RES> request(RunContext runContext, HttpRequest.HttpRequestBuilder requestBuilder, Class<RES> responseType)
         throws HttpClientException, IllegalVariableEvaluationException {
 
-        requestBuilder
-            .addHeader("Content-Type", "application/json")
-            .build();
+        boolean hasContentType = addHeaders(runContext, requestBuilder).keySet().stream()
+            .anyMatch("Content-Type"::equalsIgnoreCase);
+        if (!hasContentType) {
+            requestBuilder.addHeader("Content-Type", "application/json");
+        }
 
         var requestOptions = this.options;
         if (this.clientId != null) {
