@@ -13,6 +13,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockTest;
 import com.github.tomakehurst.wiremock.stubbing.Scenario;
 
 import io.kestra.core.http.client.configurations.HttpConfiguration;
+import io.kestra.core.http.client.configurations.TimeoutConfiguration;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
@@ -114,7 +115,7 @@ class AuthenticationTest {
 
     @Test
     void basicAuthPreservesConfiguredOptions(WireMockRuntimeInfo server) throws Exception {
-        var options = HttpConfiguration.builder().readTimeout(Duration.ofSeconds(5)).build();
+        var options = HttpConfiguration.builder().timeout(TimeoutConfiguration.builder().readIdleTimeout(Property.ofValue(Duration.ofSeconds(5))).build()).build();
         verifyBasicAuthOptions(server, options);
     }
 

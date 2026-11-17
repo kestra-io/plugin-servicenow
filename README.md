@@ -48,6 +48,22 @@
 - Provides plugin components under `io.kestra.plugin.servicenow`.
 - Includes classes such as `Delete`, `Update`, `Post`, `CreateIncident`, `Get`.
 
+### Change management and CMDB ingestion
+
+Use `CreateChange`, `WaitForApproval` and `TransitionChange` for the native Change Management API. Approval timeouts and rejections fail the task. Transitions use current server-model conditions and read the resulting state back.
+
+`LoadImportSet` sends scalar records through the instance's synchronous transform maps and checks every result, including errors inside HTTP 201. `UpsertCI` uses Identification and Reconciliation (IRE) with a registered data source and verifies persisted fields. Neither task writes CMDB records through the generic Table API. Both can recheck an approved `changeSysId` immediately before writing.
+
+All existing task types stay in place. The new tasks use the same connection settings and support the current flat plugin namespace.
+
+See the [plugin guide](src/main/resources/doc/io.kestra.plugin.servicenow.md) for the full approval/import/close flow, instance permissions, custom-model waypoints and partial-run recovery.
+
+### Verification
+
+Run `./verify.sh` with JDK 21. The release verification workflow runs the same gate: Spotless, compilation with deprecation warnings as errors, unit/functional tests, plugin documentation lint and the packaged jar. See [SECURITY.md](SECURITY.md) for the new API boundaries and known limits.
+
+The native task tests use unconditional WireMock fixtures. A built-jar fixture verifies Kestra integration; fixture tests do not verify a live ServiceNow instance, its ACLs or custom transform/change models.
+
 ## Documentation
 
 * Full documentation can be found under [kestra.io/docs](https://kestra.io/docs)
