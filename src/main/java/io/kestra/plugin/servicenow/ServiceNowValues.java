@@ -1,13 +1,16 @@
 package io.kestra.plugin.servicenow;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -47,7 +50,7 @@ final class ServiceNowValues {
         if (!SYS_ID.matcher(result).matches()) {
             throw new IllegalArgumentException("ServiceNow %s must be a 32-character hexadecimal sys_id.".formatted(property));
         }
-        return result.toLowerCase(java.util.Locale.ROOT);
+        return result.toLowerCase(Locale.ROOT);
     }
 
     static boolean isSysId(String value) {
@@ -133,7 +136,7 @@ final class ServiceNowValues {
             if (value.length() > MAX_TEXT) {
                 throw new IllegalArgumentException("ServiceNow field %s exceeds %d characters.".formatted(key, MAX_TEXT));
             }
-            bytes += key.getBytes(java.nio.charset.StandardCharsets.UTF_8).length + value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            bytes += key.getBytes(StandardCharsets.UTF_8).length + value.getBytes(StandardCharsets.UTF_8).length;
             if (bytes > MAX_ROW_BYTES) {
                 throw new IllegalArgumentException("ServiceNow row exceeds 1 MiB. Split or narrow its fields.");
             }
@@ -167,11 +170,11 @@ final class ServiceNowValues {
             Instant instant;
             try {
                 instant = OffsetDateTime.parse(value).toInstant();
-            } catch (java.time.format.DateTimeParseException e) {
+            } catch (DateTimeParseException e) {
                 instant = LocalDateTime.parse(value, DATE).toInstant(ZoneOffset.UTC);
             }
             return DATE.format(instant.atOffset(ZoneOffset.UTC));
-        } catch (java.time.format.DateTimeParseException e) {
+        } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("ServiceNow %s must be an ISO timestamp with offset or yyyy-MM-dd HH:mm:ss in UTC.".formatted(property), e);
         }
     }

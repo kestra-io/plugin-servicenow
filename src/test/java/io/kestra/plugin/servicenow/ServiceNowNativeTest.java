@@ -6,11 +6,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockRuntimeInfo;
 import com.github.tomakehurst.wiremock.junit5.WireMockTest;
+import com.github.tomakehurst.wiremock.stubbing.Scenario;
 
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.flows.Flow;
@@ -40,13 +44,131 @@ class ServiceNowNativeTest extends NativeTaskTestSupport {
         stubFor(post(urlEqualTo("/oauth_token.do")).willReturn(okJson("{\"access_token\":\"native-access-token\"}")));
         stubFor(post(urlEqualTo("/api/now/import/imp_computer")).willReturn(created().withBody(imported("ignored", ""))));
         var task = connected(LoadImportSet.builder(), server, LoadImportSet.class).stagingTable(Property.ofValue("imp_computer"))
+            .from(List.of(Map.of("name", "web-01"), Map.of("name", "web-02"), Map.of("name", "web-03"))).clientId(Property.ofValue("native-client"))
+            .clientSecret(Property.ofValue("native-client-secret")).build();
+        assertEquals(3, task.run(context(task)).getSubmittedRows());
+        assertEquals(3, task.run(context(task)).getSubmittedRows());
+        verify(2, postRequestedFor(urlEqualTo("/oauth_token.do")));
+        verify(6, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")).withHeader("Authorization", equalTo("Bearer native-access-token")));
+        assertFalse(task.toString().contains("native-client-secret"));
+    }
+
+    @Test
+    void shouldClampLargeCoreTimeoutsToTheInternalBudget(WireMockRuntimeInfo server) throws Exception {
+        var task = connected(CreateChange.builder(), server, CreateChange.class).shortDescription(Property.ofValue("Patch"))
+            .timeout(Property.ofValue(Duration.ofDays(1000000))).build();
+        try (var poll = task.begin(context(task), Duration.ofSeconds(30), Duration.ofMinutes(5))) {
+            assertTrue(poll.remaining().compareTo(Duration.ofMinutes(5)) <= 0);
+            assertTrue(poll.remaining().compareTo(Duration.ofMinutes(4)) > 0);
+        }
+        for (var timeout : List.of(Duration.ZERO, Duration.ofSeconds(-1))) {
+            var invalid = connected(CreateChange.builder(), server, CreateChange.class).shortDescription(Property.ofValue("Patch"))
+                .timeout(Property.ofValue(timeout)).build();
+            assertThrows(IllegalArgumentException.class, () -> invalid.begin(context(invalid), Duration.ofSeconds(30), Duration.ofMinutes(5)));
+        }
+        verify(0, anyRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void shouldRefreshAfter401AndReuseTheNewToken(WireMockRuntimeInfo server) throws Exception {
+        stubFor(
+            post(urlEqualTo("/oauth_token.do")).inScenario("token refresh").whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(okJson("{\"access_token\":\"expired-token\"}")).willSetStateTo("issued")
+        );
+        stubFor(
+            post(urlEqualTo("/oauth_token.do")).inScenario("token refresh").whenScenarioStateIs("issued")
+                .willReturn(okJson("{\"access_token\":\"fresh-token\"}"))
+        );
+        stubFor(
+            post(urlEqualTo("/api/now/import/imp_computer")).withHeader("Authorization", equalTo("Bearer expired-token"))
+                .willReturn(unauthorized().withBody("{\"error\":{\"message\":\"Token expired\"}}"))
+        );
+        stubFor(
+            post(urlEqualTo("/api/now/import/imp_computer")).withHeader("Authorization", equalTo("Bearer fresh-token"))
+                .willReturn(created().withBody(imported("ignored", "")))
+        );
+        var task = connected(LoadImportSet.builder(), server, LoadImportSet.class).stagingTable(Property.ofValue("imp_computer"))
+            .from(List.of(Map.of("name", "web-01"), Map.of("name", "web-02"))).clientId(Property.ofValue("native-client"))
+            .clientSecret(Property.ofValue("native-client-secret")).build();
+        assertEquals(2, task.run(context(task)).getSubmittedRows());
+        verify(2, postRequestedFor(urlEqualTo("/oauth_token.do")));
+        verify(1, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")).withHeader("Authorization", equalTo("Bearer expired-token")));
+        verify(2, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")).withHeader("Authorization", equalTo("Bearer fresh-token")));
+    }
+
+    @Test
+    void shouldFailAfterOneRefreshAndRedactBothTokens(WireMockRuntimeInfo server) throws Exception {
+        stubFor(
+            post(urlEqualTo("/oauth_token.do")).inScenario("rejected tokens").whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(okJson("{\"access_token\":\"expired-token\"}")).willSetStateTo("issued")
+        );
+        stubFor(
+            post(urlEqualTo("/oauth_token.do")).inScenario("rejected tokens").whenScenarioStateIs("issued")
+                .willReturn(okJson("{\"access_token\":\"fresh-token\"}"))
+        );
+        stubFor(
+            post(urlEqualTo("/api/now/import/imp_computer")).willReturn(
+                unauthorized()
+                    .withBody(json(Map.of("error", Map.of("message", "Rejected expired-token and fresh-token", "detail", PASSWORD))))
+            )
+        );
+        var task = connected(LoadImportSet.builder(), server, LoadImportSet.class).stagingTable(Property.ofValue("imp_computer"))
             .from(Map.of("name", "web-01")).clientId(Property.ofValue("native-client"))
             .clientSecret(Property.ofValue("native-client-secret")).build();
-        assertEquals(1, task.run(context(task)).getSubmittedRows());
-        assertEquals(1, task.run(context(task)).getSubmittedRows());
+        var error = assertThrows(IllegalStateException.class, () -> task.run(context(task)));
+        assertTrue(error.getMessage().contains("HTTP 401"));
+        assertFalse(error.getMessage().contains("expired-token"));
+        assertFalse(error.getMessage().contains("fresh-token"));
+        assertFalse(error.getMessage().contains(PASSWORD));
         verify(2, postRequestedFor(urlEqualTo("/oauth_token.do")));
-        verify(2, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")).withHeader("Authorization", equalTo("Bearer native-access-token")));
-        assertFalse(task.toString().contains("native-client-secret"));
+        verify(2, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")));
+    }
+
+    @Test
+    void shouldNotRefreshOrReplayOtherHttpFailures(WireMockRuntimeInfo server) throws Exception {
+        for (var status : List.of(403, 500)) {
+            resetAllRequests();
+            stubFor(post(urlEqualTo("/oauth_token.do")).willReturn(okJson("{\"access_token\":\"native-access-token\"}")));
+            stubFor(
+                post(urlEqualTo("/api/now/import/imp_computer")).willReturn(
+                    aResponse().withStatus(status)
+                        .withBody("{\"error\":{\"message\":\"Request refused\"}}")
+                )
+            );
+            var task = connected(LoadImportSet.builder(), server, LoadImportSet.class).stagingTable(Property.ofValue("imp_computer"))
+                .from(Map.of("name", "web-01")).clientId(Property.ofValue("native-client"))
+                .clientSecret(Property.ofValue("native-client-secret")).build();
+            assertTrue(assertThrows(IllegalStateException.class, () -> task.run(context(task))).getMessage().contains("HTTP %s".formatted(status)));
+            verify(1, postRequestedFor(urlEqualTo("/oauth_token.do")));
+            verify(1, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")));
+        }
+    }
+
+    @Test
+    void shouldNotReplayAWriteWhenCancelledDuringTokenRefresh(WireMockRuntimeInfo server) throws Exception {
+        stubFor(
+            post(urlEqualTo("/oauth_token.do")).inScenario("cancel refresh").whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(okJson("{\"access_token\":\"expired-token\"}")).willSetStateTo("issued")
+        );
+        stubFor(
+            post(urlEqualTo("/oauth_token.do")).inScenario("cancel refresh").whenScenarioStateIs("issued")
+                .willReturn(okJson("{\"access_token\":\"fresh-token\"}").withFixedDelay(1500))
+        );
+        stubFor(post(urlEqualTo("/api/now/import/imp_computer")).willReturn(unauthorized()));
+        var task = connected(LoadImportSet.builder(), server, LoadImportSet.class).stagingTable(Property.ofValue("imp_computer"))
+            .from(Map.of("name", "web-01")).clientId(Property.ofValue("native-client"))
+            .clientSecret(Property.ofValue("native-client-secret")).build();
+        var context = context(task);
+        var result = CompletableFuture.supplyAsync(() -> assertThrows(CancellationException.class, () -> task.run(context)));
+        try {
+            await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> verify(2, postRequestedFor(urlEqualTo("/oauth_token.do"))));
+            task.kill();
+            assertTrue(result.get(5, TimeUnit.SECONDS).getMessage().contains("cancelled"));
+            verify(1, postRequestedFor(urlEqualTo("/api/now/import/imp_computer")));
+        } finally {
+            task.kill();
+            result.get(5, TimeUnit.SECONDS);
+        }
     }
 
     @Test

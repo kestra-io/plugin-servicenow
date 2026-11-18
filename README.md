@@ -58,10 +58,6 @@ All existing task types stay in place. The new tasks use the same connection set
 
 See the [plugin guide](src/main/resources/doc/io.kestra.plugin.servicenow.md) for the full approval/import/close flow, instance permissions, custom-model waypoints and partial-run recovery.
 
-### Verification
-
-Run `./verify.sh` with JDK 21. The release verification workflow runs the same gate: Spotless, compilation with deprecation warnings as errors, unit/functional tests, plugin documentation lint and the packaged jar. See [SECURITY.md](SECURITY.md) for the new API boundaries and known limits.
-
 The native task tests use unconditional WireMock fixtures. A built-jar fixture verifies Kestra integration; fixture tests do not verify a live ServiceNow instance, its ACLs or custom transform/change models.
 
 ## Documentation

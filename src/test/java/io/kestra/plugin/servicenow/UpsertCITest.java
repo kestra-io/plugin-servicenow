@@ -1,5 +1,6 @@
 package io.kestra.plugin.servicenow;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,7 @@ class UpsertCITest extends NativeTaskTestSupport {
         stubFor(
             post(urlPathEqualTo("/api/now/identifyreconcile")).inScenario("ire write").whenScenarioStateIs(Scenario.STARTED).willReturn(okJson(ire("UPDATE", CI))).willSetStateTo("updated")
         );
-        var task = task(server).sourceNativeKey(Property.ofValue("inventory-web-01")).build();
+        var task = task(server).timeout(Property.ofValue(Duration.ofMinutes(15))).sourceNativeKey(Property.ofValue("inventory-web-01")).build();
         var output = task.run(context(task));
         assertEquals("UPDATE", output.getOperation());
         assertEquals(CI, output.getSysId());
@@ -89,7 +90,6 @@ class UpsertCITest extends NativeTaskTestSupport {
         stubFor(post(urlPathEqualTo("/api/now/identifyreconcile/query")).willReturn(okJson(ire("INSERT", "Unknown"))));
         var task = task(server).dryRun(Property.ofValue(true)).build();
         var result = task.run(context(task));
-        assertTrue(result.getDryRun());
         assertFalse(result.getVerified());
         assertNull(result.getSysId());
         assertEquals("10.20.0.11", result.getAfter().get("ip_address"));

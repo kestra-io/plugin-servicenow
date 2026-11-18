@@ -3,8 +3,10 @@ package io.kestra.plugin.servicenow;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -54,18 +56,22 @@ final class ServiceNowApi {
         return call("PATCH", path, Map.of(), body);
     }
 
-    private JsonNode call(String method, String path, Map<String, ?> query, Object body) throws Exception {
+    URI requestUri(String path, Map<String, ?> query) {
         var parts = query.entrySet().stream().filter(entry -> entry.getValue() != null)
             .map(entry -> "%s=%s".formatted(encode(entry.getKey()), encode(entry.getValue().toString()))).toList();
         var suffix = parts.isEmpty() ? "" : "?" + String.join("&", parts);
-        var request = HttpRequest.builder().uri(URI.create(base + path + suffix)).method(method).addHeader("Accept", "application/json");
+        return URI.create(base + path + suffix);
+    }
+
+    private JsonNode call(String method, String path, Map<String, ?> query, Object body) throws Exception {
+        var request = HttpRequest.builder().uri(requestUri(path, query)).method(method).addHeader("Accept", "application/json");
         if (body != null) {
             request.body(HttpRequest.JsonRequestBody.of(body));
         }
         Response response;
         try {
             response = transport.execute(request);
-        } catch (java.util.concurrent.CancellationException e) {
+        } catch (CancellationException e) {
             throw e;
         } catch (ApiException e) {
             throw e;
@@ -114,7 +120,7 @@ final class ServiceNowApi {
     private static String errorDetail(JsonNode document) {
         var error = document.path("error");
         if (error.isObject()) {
-            return String.join("; ", java.util.List.of(error.path("message").asText(""), error.path("detail").asText("")).stream().filter(value -> !value.isBlank()).toList());
+            return String.join("; ", List.of(error.path("message").asText(""), error.path("detail").asText("")).stream().filter(value -> !value.isBlank()).toList());
         }
         return error.isTextual() ? error.asText() : document.path("message").asText("");
     }

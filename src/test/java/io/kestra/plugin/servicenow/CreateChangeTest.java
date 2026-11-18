@@ -27,13 +27,13 @@ class CreateChangeTest extends NativeTaskTestSupport {
             .<String, Object> of("short_description", "Patch web-01", "implementation_plan", "Import inventory", "start_date", "2026-11-17 10:00:00", "end_date", "2026-11-17 11:00:00");
         stubFor(post(urlEqualTo("/api/sn_chg_rest/change")).willReturn(okJson(change("-5", "New", "not requested", fields))));
         stubFor(get(urlEqualTo("/api/sn_chg_rest/change/" + CHANGE)).willReturn(okJson(change("-5", "New", "not requested", fields))));
-        var task = task(server).implementationPlan(Property.ofValue("Import inventory")).plannedStart(Property.ofValue("2026-11-17T12:00:00+02:00"))
+        var task = task(server).timeout(Property.ofValue(Duration.ofMinutes(10))).implementationPlan(Property.ofValue("Import inventory"))
+            .plannedStart(Property.ofValue("2026-11-17T12:00:00+02:00"))
             .plannedEnd(Property.ofValue("2026-11-17T13:00:00+02:00")).build();
         var output = task.run(context(task));
         assertEquals(CHANGE, output.getSysId());
         assertEquals("CHG001", output.getNumber());
         assertEquals("-5", output.getState());
-        assertFalse(output.getApprovalRequested());
         assertTrue(output.getUrl().endsWith("change_request.do?sys_id=" + CHANGE));
         verify(
             postRequestedFor(urlEqualTo("/api/sn_chg_rest/change")).withRequestBody(
@@ -69,6 +69,25 @@ class CreateChangeTest extends NativeTaskTestSupport {
     }
 
     @Test
+    void shouldRejectOversizedEncodedStandardOverridesBeforeAnyRequest(WireMockRuntimeInfo server) {
+        var task = task(server).model(Property.ofValue(CreateChange.Model.STANDARD)).standardTemplate(Property.ofValue(TEMPLATE))
+            .justification(Property.ofValue("é".repeat(400))).build();
+        var error = assertThrows(IllegalArgumentException.class, () -> task.run(context(task)));
+        assertTrue(error.getMessage().contains("2048"));
+        verify(0, anyRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void shouldRejectStandardFieldsOwnedByThePublishedTemplate(WireMockRuntimeInfo server) {
+        for (var field : List.of("description", "implementation_plan", "backout_plan", "test_plan")) {
+            var task = task(server).model(Property.ofValue(CreateChange.Model.STANDARD)).standardTemplate(Property.ofValue(TEMPLATE))
+                .data(Property.ofValue(Map.of(field, "Template-owned content"))).build();
+            assertTrue(assertThrows(IllegalArgumentException.class, () -> task.run(context(task))).getMessage().contains("published template"));
+        }
+        verify(0, anyRequestedFor(anyUrl()));
+    }
+
+    @Test
     void shouldRequestAssessAndConfirmGeneratedApprovalRecords(WireMockRuntimeInfo server) throws Exception {
         var fields = Map.<String, Object> of("short_description", "Patch web-01", "assignment_group", GROUP);
         stubFor(post(urlEqualTo("/api/sn_chg_rest/change")).willReturn(okJson(change("-5", "New", "not requested", fields))));
@@ -87,7 +106,6 @@ class CreateChangeTest extends NativeTaskTestSupport {
         stubFor(get(urlPathEqualTo("/api/now/table/sysapproval_approver")).willReturn(okJson(audit("requested"))));
         var task = task(server).assignmentGroup(Property.ofValue(GROUP)).requestApproval(Property.ofValue(true)).build();
         var output = task.run(context(task));
-        assertTrue(output.getApprovalRequested());
         assertEquals("-4", output.getState());
         assertEquals("requested", output.getApproval());
         verify(patchRequestedFor(urlEqualTo("/api/sn_chg_rest/change/" + CHANGE)).withRequestBody(equalToJson("{\"state\":\"-4\"}")));

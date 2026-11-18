@@ -2,7 +2,9 @@ package io.kestra.plugin.servicenow;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -50,7 +53,7 @@ import lombok.experimental.SuperBuilder;
     Each input can produce multiple transform results. Results default to an ION file.
     The load is not transactional. A failed load reports its partial-results URI; retries may replay
     accepted rows, so configure coalescing on the server. No insertMultiple acknowledgement is treated
-    as completed ingestion. Default task timeout is 10 minutes, maximum 24 hours.
+    as completed ingestion. The internal polling budget defaults to 10 minutes, maximum 24 hours.
     """)
 @Plugin(examples = @Example(title = "Load computer inventory through a transform map", full = true, code = """
     id: servicenow_import_inventory
@@ -72,7 +75,9 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
     private static final long MAX_INPUT_BYTES = 8 * 1024 * 1024;
 
     @NotNull
-    @Schema(title = "Staging table", description = "Import staging table API name. Configure its transform maps and coalescing before loading.")
+    @Schema(title = "Staging table", description = """
+        Import staging table API name. Configure its transform maps and coalescing before loading.
+        """)
     @PluginProperty(group = "destination")
     private Property<String> stagingTable;
     @NotNull
@@ -85,23 +90,33 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
     @ToString.Exclude
     private Object from;
     @Builder.Default
-    @Schema(title = "Maximum input rows", description = "Between 1 and 10000, default 1000. Exceeding the limit fails before writing.", defaultValue = "1000")
+    @Schema(title = "Maximum input rows", description = """
+        Between 1 and 10000, default 1000. Exceeding the limit fails before writing.
+        """, defaultValue = "1000")
     @PluginProperty(group = "processing")
     private Property<@Min(1) @Max(10000) Integer> maxRows = Property.ofValue(1000);
-    @Schema(title = "Statuses that fail the load", description = "Defaults to [ERROR]. IGNORED is a normal no-change result. Unknown statuses always fail.")
+    @Schema(title = "Statuses that fail the load", description = """
+        Defaults to [ERROR]. IGNORED is a normal no-change result. Unknown statuses always fail.
+        """)
     @PluginProperty(group = "reliability")
     private Property<List<Status>> failOn;
     @Builder.Default
     @Schema(
-        title = "Stop on the first failed transform", description = "True by default. False processes the remaining input rows before failing with the partial results.", defaultValue = "true"
+        title = "Stop on the first failed transform", description = """
+            True by default. False processes the remaining input rows before failing with the partial results.
+            """, defaultValue = "true"
     )
     @PluginProperty(group = "reliability")
     private Property<Boolean> failFast = Property.ofValue(true);
     @Builder.Default
-    @Schema(title = "Fetch type", description = "STORE returns an ION URI, FETCH returns rows, FETCH_ONE returns the first result and NONE returns counts only.", defaultValue = "STORE")
+    @Schema(title = "Fetch type", description = """
+        STORE returns an ION URI, FETCH returns rows, FETCH_ONE returns the first result and NONE returns counts only.
+        """, defaultValue = "STORE")
     @PluginProperty(group = "processing")
     private Property<FetchType> fetchType = Property.ofValue(FetchType.STORE);
-    @Schema(title = "Approved change sys_id", description = "Optional. Rechecks approval through the Change API immediately before each input-row write.")
+    @Schema(title = "Approved change sys_id", description = """
+        Optional. Rechecks approval through the Change API immediately before each input-row write.
+        """)
     @PluginProperty(group = "reliability")
     private Property<String> changeSysId;
 
@@ -125,19 +140,19 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
             if (rChange != null) {
                 rChange = ServiceNowValues.sysId(rChange, "changeSysId");
             }
-            var input = read(context, rLimit, poll);
+            var rRows = read(context, rLimit, poll);
             var api = api(context, poll);
             try (var results = new Results(context, rFetch)) {
                 var failed = false;
                 String failureDetail = null;
                 var submitted = 0;
                 try {
-                    for (var index = 0; index < input.size(); index++) {
+                    for (var index = 0; index < rRows.size(); index++) {
                         poll.check();
                         if (rChange != null) {
                             ServiceNowRecords.requireApproved(api, rChange);
                         }
-                        var response = api.post("api/now/import/%s".formatted(rTable), Map.of(), input.get(index));
+                        var response = api.post("api/now/import/%s".formatted(rTable), Map.of(), rRows.get(index));
                         submitted++;
                         var rows = response.path("result");
                         if (!rows.isArray() || rows.isEmpty()) {
@@ -170,8 +185,8 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
                         .uri(uri).build();
                 } catch (Exception e) {
                     var uri = results.publish();
-                    if (e instanceof java.util.concurrent.CancellationException) {
-                        throw new java.util.concurrent.CancellationException("ServiceNow import cancelled. Partial results: %s. Check accepted rows before retrying.".formatted(uri));
+                    if (e instanceof CancellationException) {
+                        throw new CancellationException("ServiceNow import cancelled. Partial results: %s. Check accepted rows before retrying.".formatted(uri));
                     }
                     throw new IllegalStateException(
                         "ServiceNow import stopped after %d decoded input responses. Partial results: %s. Check the last request before retrying; it may already have been accepted. %s"
@@ -195,8 +210,8 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
             {
                 var values = ServiceNowValues.stringValues(row);
                 var size = values.entrySet().stream().mapToLong(
-                    entry -> entry.getKey().getBytes(java.nio.charset.StandardCharsets.UTF_8).length
-                        + entry.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+                    entry -> entry.getKey().getBytes(StandardCharsets.UTF_8).length
+                        + entry.getValue().getBytes(StandardCharsets.UTF_8).length
                 ).sum();
                 if (bytes.addAndGet(size) > MAX_INPUT_BYTES) {
                     throw new IllegalArgumentException("ServiceNow input exceeds 8 MiB. Split the load.");
@@ -238,7 +253,7 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
         private final RunContext context;
         private final FetchType fetch;
         private final Path file;
-        private final java.io.OutputStream writer;
+        private final OutputStream writer;
         private final Map<Status, Integer> counts = new EnumMap<>(Status.class);
         private final List<Result> rows;
         private Result first;
@@ -309,15 +324,25 @@ public class LoadImportSet extends AbstractServiceNowPollingTask implements Runn
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "Input rows with accepted HTTP responses", description = "An accepted response is not necessarily a successful transformation. Inspect counts and per-result statuses.")
+        @Schema(title = "Input rows with accepted HTTP responses", description = """
+            An accepted response is not necessarily a successful transformation. Inspect counts and per-result statuses.
+            """)
         private final Integer submittedRows;
-        @Schema(title = "Per-transform status counts", description = "A row can run multiple transform maps. Counts refer to transform results, not input rows.")
+        @Schema(title = "Per-transform status counts", description = """
+            A row can run multiple transform maps. Counts refer to transform results, not input rows.
+            """)
         private final Map<Status, Integer> counts;
-        @Schema(title = "Transform results", description = "Present with FETCH.")
+        @Schema(title = "Transform results", description = """
+            Present with FETCH.
+            """)
         private final List<Result> rows;
-        @Schema(title = "First transform result", description = "Present with FETCH_ONE.")
+        @Schema(title = "First transform result", description = """
+            Present with FETCH_ONE.
+            """)
         private final Result row;
-        @Schema(title = "ION results URI", description = "Present with STORE. A failed load includes its partial-results URI in the error.")
+        @Schema(title = "ION results URI", description = """
+            Present with STORE. A failed load includes its partial-results URI in the error.
+            """)
         private final URI uri;
     }
 }

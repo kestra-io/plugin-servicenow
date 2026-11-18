@@ -3,8 +3,10 @@ package io.kestra.plugin.servicenow;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -32,11 +34,14 @@ import lombok.experimental.SuperBuilder;
 @Schema(title = "Create a ServiceNow change request", description = """
     Creates NORMAL or EMERGENCY changes through the JSON-capable Change Management API, or a STANDARD
     change from a published template. Requested fields are read back before returning.
+    STANDARD overrides use query parameters, with a 2048-byte complete encoded URL ceiling.
+    Query text may appear in access logs; do not include secrets. STANDARD descriptions and plans are template-owned.
     requestApproval resolves approvalState against the instance's nextstates, requests that transition
     and waits for generated approval records. It never marks a change approved itself.
     Human references need read access to their reference tables; sys_ids avoid those lookups.
     Change reads and writes do not use the Table API. Approval setup additionally needs read access to
-    sysapproval_approver. Task timeout defaults to 30 seconds and is capped at 5 minutes.
+    sysapproval_approver. The internal polling budget defaults to 30 seconds and is capped at 5 minutes.
+    A larger core timeout is accepted but does not extend this internal budget.
     Creation is not idempotent. On a partial failure, check the reported change sys_id before retrying.
     """)
 @Plugin(examples = @Example(title = "Open a normal change and request approval", full = true, code = """
@@ -55,6 +60,9 @@ import lombok.experimental.SuperBuilder;
         requestApproval: true
     """))
 public class CreateChange extends AbstractServiceNowPollingTask implements RunnableTask<CreateChange.Output>, TicketingTaskInterface {
+    private static final int MAX_STANDARD_URL_BYTES = 2048;
+    private static final Set<String> STANDARD_TEMPLATE_FIELDS = Set.of("description", "backout_plan", "test_plan", "implementation_plan");
+
     public enum Model {
         NORMAL,
         STANDARD,
@@ -62,13 +70,20 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
     }
 
     @Builder.Default
-    @Schema(title = "Change type", description = "NORMAL by default. STANDARD requires standardTemplate.", defaultValue = "NORMAL")
+    @Schema(title = "Change type", description = """
+        NORMAL by default. STANDARD requires standardTemplate.
+        """, defaultValue = "NORMAL")
     @PluginProperty(group = "main")
     private Property<Model> model = Property.ofValue(Model.NORMAL);
-    @Schema(title = "Standard template sys_id", description = "Required for STANDARD; identifies a published standard change template.")
+    @Schema(title = "Standard template sys_id", description = """
+        Required for STANDARD; identifies a published standard change template.
+        Overrides use query parameters with a 2048-byte encoded URL ceiling. The template supplies descriptions and plans.
+        """)
     @PluginProperty(group = "main")
     private Property<String> standardTemplate;
-    @Schema(title = "Change model", description = "Optional chg_model name for NORMAL or EMERGENCY. The server owns model behavior.")
+    @Schema(title = "Change model", description = """
+        Optional chg_model name for NORMAL or EMERGENCY. The server owns model behavior.
+        """)
     @PluginProperty(group = "main")
     private Property<String> changeModel;
     @NotNull
@@ -80,10 +95,14 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
     @PluginProperty(group = "main")
     @TicketingField(role = TicketingField.Role.CASE_DESCRIPTION)
     private Property<String> changeDescription;
-    @Schema(title = "Assignment group", description = "Group name or sys_id. Required when requestApproval is true.")
+    @Schema(title = "Assignment group", description = """
+        Group name or sys_id. Required when requestApproval is true.
+        """)
     @PluginProperty(group = "main")
     private Property<String> assignmentGroup;
-    @Schema(title = "Configuration item", description = "CI name or sys_id. Ambiguous names fail before creation.")
+    @Schema(title = "Configuration item", description = """
+        CI name or sys_id. Ambiguous names fail before creation.
+        """)
     @PluginProperty(group = "main")
     private Property<String> configurationItem;
     @Schema(title = "Justification")
@@ -98,22 +117,32 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
     @Schema(title = "Test plan")
     @PluginProperty(group = "main")
     private Property<String> testPlan;
-    @Schema(title = "Planned start", description = "ISO timestamp with offset or yyyy-MM-dd HH:mm:ss in UTC. Set with plannedEnd.")
+    @Schema(title = "Planned start", description = """
+        ISO timestamp with offset or yyyy-MM-dd HH:mm:ss in UTC. Set with plannedEnd.
+        """)
     @PluginProperty(group = "main")
     private Property<String> plannedStart;
-    @Schema(title = "Planned end", description = "Must be later than plannedStart. Both are converted to UTC.")
+    @Schema(title = "Planned end", description = """
+        Must be later than plannedStart. Both are converted to UTC.
+        """)
     @PluginProperty(group = "main")
     private Property<String> plannedEnd;
-    @Schema(title = "Additional change fields", description = "Scalar API fields. Typed inputs take precedence. sys_id, state and approval cannot be supplied.")
+    @Schema(title = "Additional change fields", description = """
+        Scalar API fields. Typed inputs take precedence. sys_id, state and approval cannot be supplied.
+        """)
     @PluginProperty(group = "advanced")
     @ToString.Exclude
     private Property<Map<String, Object>> data;
     @Builder.Default
-    @Schema(title = "Request approval", description = "False by default. Requests the configured model transition and verifies approval records were generated.", defaultValue = "false")
+    @Schema(title = "Request approval", description = """
+        False by default. Requests the configured model transition and verifies approval records were generated.
+        """, defaultValue = "false")
     @PluginProperty(group = "main")
     private Property<Boolean> requestApproval = Property.ofValue(false);
     @Builder.Default
-    @Schema(title = "Approval request state", description = "State value or label, Assess by default. Configure for custom models.", defaultValue = "Assess")
+    @Schema(title = "Approval request state", description = """
+        State value or label, Assess by default. Configure for custom models.
+        """, defaultValue = "Assess")
     @PluginProperty(group = "advanced")
     private Property<String> approvalState = Property.ofValue("Assess");
 
@@ -135,6 +164,9 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
             if (rModel == Model.STANDARD && body.containsKey("chg_model")) {
                 throw new IllegalArgumentException("STANDARD data cannot override its published template's chg_model.");
             }
+            if (rModel == Model.STANDARD && body.keySet().stream().anyMatch(STANDARD_TEMPLATE_FIELDS::contains)) {
+                throw new IllegalArgumentException("STANDARD description and plans come from the published template and cannot be overridden. Remove those inputs or use NORMAL/EMERGENCY.");
+            }
             var rRequest = context.render(requestApproval).as(Boolean.class).orElse(false);
             var rGroup = context.render(assignmentGroup).as(String.class).orElse(null);
             if (rRequest) {
@@ -148,7 +180,7 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
             if (rCi != null) {
                 body.put("cmdb_ci", ServiceNowRecords.reference(api, "cmdb_ci", rCi, List.of("name")));
             }
-            body.put("type", rModel.name().toLowerCase(java.util.Locale.ROOT));
+            body.put("type", rModel.name().toLowerCase(Locale.ROOT));
             var expected = new LinkedHashMap<>(body);
             var modelIdentifier = rChangeModel != null ? rChangeModel : body.get("chg_model");
             if (modelIdentifier != null) {
@@ -157,10 +189,16 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
                 expected.put("chg_model", resolved.sysId());
             }
             ServiceNowValues.stringValues(new LinkedHashMap<>(body));
+            var path = rModel == Model.STANDARD ? "api/sn_chg_rest/change/standard/%s".formatted(rTemplate) : "api/sn_chg_rest/change";
+            if (rModel == Model.STANDARD && api.requestUri(path, body).toASCIIString().length() > MAX_STANDARD_URL_BYTES) {
+                throw new IllegalArgumentException(
+                    "STANDARD creation URL exceeds %d encoded bytes. Shorten the overrides or use NORMAL/EMERGENCY for long content.".formatted(MAX_STANDARD_URL_BYTES)
+                );
+            }
             var created = ServiceNowValues.record(
                 rModel == Model.STANDARD
-                    ? api.post("api/sn_chg_rest/change/standard/%s".formatted(rTemplate), body, null)
-                    : api.post("api/sn_chg_rest/change", Map.of(), body)
+                    ? api.post(path, body, null)
+                    : api.post(path, Map.of(), body)
             );
             var id = ServiceNowValues.recordId(created);
             try {
@@ -185,9 +223,9 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
                 context.logger().info("Created ServiceNow change {}", id);
                 return Output.builder().sysId(id).number(ServiceNowValues.field(record, "number")).url(api.recordUrl("change_request", id))
                     .state(ServiceNowValues.field(record, "state")).stateLabel(record.path("state").path("display_value").asText(null))
-                    .approval(ServiceNowValues.field(record, "approval")).approvalRequested(rRequest).build();
-            } catch (java.util.concurrent.CancellationException e) {
-                throw new java.util.concurrent.CancellationException("ServiceNow change %s was created before cancellation. Check it before retrying.".formatted(id));
+                    .approval(ServiceNowValues.field(record, "approval")).build();
+            } catch (CancellationException e) {
+                throw new CancellationException("ServiceNow change %s was created before cancellation. Check it before retrying.".formatted(id));
             } catch (Exception e) {
                 throw new IllegalStateException("ServiceNow change %s was created but setup did not complete. Check it before retrying. %s".formatted(id, e.getMessage()), e);
             }
@@ -206,25 +244,25 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
         put(context, result, "implementation_plan", implementationPlan);
         put(context, result, "backout_plan", backoutPlan);
         put(context, result, "test_plan", testPlan);
-        var start = ServiceNowValues.date(context.render(plannedStart).as(String.class).orElse(null), "plannedStart");
-        var end = ServiceNowValues.date(context.render(plannedEnd).as(String.class).orElse(null), "plannedEnd");
-        if ((start == null) != (end == null) || start != null && end.compareTo(start) <= 0) {
+        var rStart = ServiceNowValues.date(context.render(plannedStart).as(String.class).orElse(null), "plannedStart");
+        var rEnd = ServiceNowValues.date(context.render(plannedEnd).as(String.class).orElse(null), "plannedEnd");
+        if ((rStart == null) != (rEnd == null) || rStart != null && rEnd.compareTo(rStart) <= 0) {
             throw new IllegalArgumentException("ServiceNow plannedStart and plannedEnd must be supplied together, with end later than start.");
         }
-        if (start != null) {
-            result.put("start_date", start);
-            result.put("end_date", end);
+        if (rStart != null) {
+            result.put("start_date", rStart);
+            result.put("end_date", rEnd);
         }
         return result;
     }
 
     private static void put(RunContext context, Map<String, String> fields, String key, Property<String> property) throws Exception {
-        context.render(property).as(String.class).ifPresent(value ->
+        context.render(property).as(String.class).ifPresent(rValue ->
         {
-            if (value.length() > ServiceNowValues.MAX_TEXT) {
+            if (rValue.length() > ServiceNowValues.MAX_TEXT) {
                 throw new IllegalArgumentException("ServiceNow change field exceeds 65536 characters. Shorten its text.");
             }
-            fields.put(key, value);
+            fields.put(key, rValue);
         });
     }
 
@@ -245,7 +283,5 @@ public class CreateChange extends AbstractServiceNowPollingTask implements Runna
         private final String stateLabel;
         @Schema(title = "Server approval value")
         private final String approval;
-        @Schema(title = "Approval records generated", description = "True only after the requested transition and approval-record check complete.")
-        private final Boolean approvalRequested;
     }
 }

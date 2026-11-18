@@ -4,7 +4,7 @@ Read and write ServiceNow records, request change approval, load inventory throu
 
 ## Authentication
 
-Set `domain` to your ServiceNow instance subdomain (no protocol, e.g. `mycompany` for `https://mycompany.service-now.com/`) or `uri` to override the full base URL, along with `username` and `password` for basic auth. For OAuth, also set `clientId` and `clientSecret`. The plugin exchanges credentials for a bearer token per request and keeps no token on the task. Store credentials in [secrets](https://kestra.io/docs/concepts/secret).
+Set `domain` to your ServiceNow instance subdomain (no protocol, e.g. `mycompany` for `https://mycompany.service-now.com/`) or `uri` to override the full base URL, along with `username` and `password` for basic auth. For OAuth, also set `clientId` and `clientSecret`. Native tasks reuse one bearer token per run and refresh it once if a request returns HTTP 401; a second 401 fails that request. Tokens are never stored on the task. Existing Table API tasks still exchange credentials per request. Store credentials in [secrets](https://kestra.io/docs/concepts/secret).
 
 ## Tasks
 
@@ -30,11 +30,13 @@ Set `domain` to your ServiceNow instance subdomain (no protocol, e.g. `mycompany
 
 Change operations do not need Table API access to `change_request`. Reference and approval-audit tables have their own ACLs. ServiceNow's API roles and instance rules still apply; test the integration user on a controlled instance.
 
-Native requests have connect/read ceilings of 5/15 seconds, shortened by the remaining task timeout, and a 4 MiB response ceiling before JSON parsing. They do not follow redirects or automatically retry writes. All new tasks support the inherited `timeout` property and stop remaining polling/writes on cancellation.
+Native requests have connect/read ceilings of 5/15 seconds, shortened by the remaining task budget, and a 4 MiB response ceiling before JSON parsing. They do not follow redirects or retry transport/server failures. OAuth authentication can retry a rejected HTTP 401 request once with a fresh token. All new tasks support the inherited `timeout` property and stop remaining polling/writes on cancellation. A larger core timeout is accepted; the internal polling budget is the smaller of that value and the task's cap.
 
 ## CreateChange
 
 `model` defaults to `NORMAL`; `EMERGENCY` is also supported. These use the JSON-capable `/api/sn_chg_rest/change` endpoint with an explicit type. `STANDARD` requires a published `standardTemplate` sys_id and uses its template endpoint. An optional `changeModel` name/sys_id selects a custom model for normal/emergency requests. Model lookups resolve the API's required name and verify the resulting stored model sys_id.
+
+The documented STANDARD endpoint accepts field overrides in query parameters and has no request-body fields. The complete encoded creation URL is limited to 2048 bytes, including the base URL, path and overrides. Shorten overrides if the limit is exceeded. Query text can appear in proxy and instance access logs; do not put secrets or sensitive free text in STANDARD overrides. Use NORMAL/EMERGENCY for long or sensitive content. STANDARD descriptions and implementation/backout/test plans come from the published template, so those overrides are rejected before creation.
 
 Set `shortDescription`, optional description/plans, assignment group, configuration item and planned dates. Typed fields override `data`. Values are bounded scalars; `data` cannot override identity, state or approval. Human group/CI names are resolved with bounded lookups and ambiguity fails before creation. Supplied fields are read back; ignored or ACL-blocked fields fail rather than silently accepting an incomplete change.
 
@@ -134,7 +136,7 @@ tasks:
 
 ## Verification and limits
 
-`./verify.sh` runs the project gate with JDK 21, including formatting, compilation with deprecation warnings as errors, tests, plugin-doc lint and the jar. Functional tests use unconditional WireMock fixtures and include rejected/expired approvals, changing model state, HTTP 201 transform errors, partial loads, IRE errors, failed readbacks and malformed/oversized responses.
+With JDK 21, `./gradlew --no-daemon spotlessCheck check shadowJar` runs formatting, compilation, tests, plugin-doc lint and packaging. Functional tests use unconditional WireMock fixtures and include rejected/expired approvals, changing model state, HTTP 201 transform errors, partial loads, IRE errors, failed readbacks and malformed/oversized responses.
 
 Fixture and built-jar runs do not verify a live ServiceNow instance's roles, custom models, transform maps or reconciliation priorities. State/approval rereads are not compare-and-swap. A remote write may commit before a transport failure; do not add blanket write retries. Timestamp and journal limitations are described above.
 

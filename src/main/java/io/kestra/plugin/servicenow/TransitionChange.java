@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -38,7 +39,7 @@ import lombok.experimental.SuperBuilder;
     verified after the transition. Work notes are sent only with the final transition and are not
     appended again when the change already reached the target. Native journal readback is not claimed.
     A refused or ineffective transition fails with its model conditions. No Table API change writes
-    are used. Defaults to a 5-minute task timeout, capped at 1 hour, and at most 32 waypoints.
+    are used. The internal polling budget defaults to 5 minutes and is capped at 1 hour, with at most 32 waypoints.
     """)
 @Plugin(examples = @Example(title = "Close an approved change", full = true, code = """
     id: servicenow_close_change
@@ -63,22 +64,33 @@ public class TransitionChange extends AbstractServiceNowPollingTask implements R
     @PluginProperty(group = "main")
     private Property<String> sysId;
     @NotNull
-    @Schema(title = "Target state", description = "Instance state value or display label. Values such as -4 and 4 remain distinct.")
+    @Schema(title = "Target state", description = """
+        Instance state value or display label. Values such as -4 and 4 remain distinct.
+        """)
     @PluginProperty(group = "main")
     private Property<String> to;
     @Schema(
         title = "Ordered intermediate states",
-        description = "Optional state labels/values. Closed defaults to [Scheduled, Implement, Review]. [] requests a direct transition. Maximum 31 intermediate states."
+        description = """
+            Optional state labels/values. Closed defaults to [Scheduled, Implement, Review].
+            [] requests a direct transition. Maximum 31 intermediate states.
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<List<String>> via;
-    @Schema(title = "Close code", description = "Required for Closed. Use the instance's API choice value, for example successful.")
+    @Schema(title = "Close code", description = """
+        Required for Closed. Use the instance's API choice value, for example successful.
+        """)
     @PluginProperty(group = "main")
     private Property<String> closeCode;
-    @Schema(title = "Close notes", description = "Required for Closed.")
+    @Schema(title = "Close notes", description = """
+        Required for Closed.
+        """)
     @PluginProperty(group = "main")
     private Property<String> closeNotes;
-    @Schema(title = "Work notes", description = "Optional journal entry sent once with the final state transition.")
+    @Schema(title = "Work notes", description = """
+        Optional journal entry sent once with the final state transition.
+        """)
     @PluginProperty(group = "main")
     @ToString.Exclude
     private Property<String> workNotes;
@@ -190,7 +202,7 @@ public class TransitionChange extends AbstractServiceNowPollingTask implements R
     private boolean sameRevision(JsonNode before, JsonNode after) {
         var revision = ServiceNowValues.field(before, "sys_mod_count");
         return (revision == null || revision.equals(ServiceNowValues.field(after, "sys_mod_count")))
-            && java.util.Objects.equals(ServiceNowValues.field(before, "approval"), ServiceNowValues.field(after, "approval"));
+            && Objects.equals(ServiceNowValues.field(before, "approval"), ServiceNowValues.field(after, "approval"));
     }
 
     @Builder
@@ -209,7 +221,9 @@ public class TransitionChange extends AbstractServiceNowPollingTask implements R
         private final String state;
         @Schema(title = "Server state label")
         private final String stateLabel;
-        @Schema(title = "State was changed", description = "False when the requested target was already reached. No work-note entry is appended in that case.")
+        @Schema(title = "State was changed", description = """
+            False when the requested target was already reached. No work-note entry is appended in that case.
+            """)
         private final Boolean changed;
         @Schema(title = "Verified transition writes")
         private final List<Step> transitions;

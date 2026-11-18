@@ -1,6 +1,7 @@
 package io.kestra.plugin.servicenow;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ import lombok.experimental.SuperBuilder;
     drops and per-item errors fail even on HTTP 200. dryRun uses only the IRE query endpoint.
     owned_by supports sys_id, email, user_name or name; configure referenceTables for other references.
     Human lookup and verification require read ACLs. Optional changeSysId rechecks approval immediately
-    before committing. Task timeout defaults to 1 minute and is capped at 10 minutes.
+    before committing. The internal polling budget defaults to 1 minute and is capped at 10 minutes.
     """)
 @Plugin(examples = @Example(title = "Reconcile a Linux server and verify the fields", full = true, code = """
     id: servicenow_reconcile_ci
@@ -61,33 +62,49 @@ public class UpsertCI extends AbstractServiceNowPollingTask implements RunnableT
     private static final Set<String> OPERATIONS = Set.of("INSERT", "UPDATE", "NO_CHANGE", "UPDATE_WITH_DOWNGRADE", "UPDATE_WITH_SWITCH", "UPDATE_WITH_UPGRADE");
 
     @NotNull
-    @Schema(title = "CMDB class", description = "CMDB class/table API name, for example cmdb_ci_linux_server. IRE validates the class.")
+    @Schema(title = "CMDB class", description = """
+        CMDB class/table API name, for example cmdb_ci_linux_server. IRE validates the class.
+        """)
     @PluginProperty(group = "main")
     private Property<String> className;
     @NotNull
-    @Schema(title = "Registered data source", description = "Exact discovery_source choice used as sysparm_data_source. Required; there is no direct-write fallback.")
+    @Schema(title = "Registered data source", description = """
+        Exact discovery_source choice used as sysparm_data_source. Required; there is no direct-write fallback.
+        """)
     @PluginProperty(group = "main")
     private Property<String> dataSource;
     @NotNull
-    @Schema(title = "CI values", description = "Between 1 and 256 scalar API fields, at most 1 MiB. Reference fields are resolved to sys_ids before IRE.")
+    @Schema(title = "CI values", description = """
+        Between 1 and 256 scalar API fields, at most 1 MiB. Reference fields are resolved to sys_ids before IRE.
+        """)
     @PluginProperty(group = "main")
     @ToString.Exclude
     private Property<Map<String, Object>> values;
-    @Schema(title = "Source-native key", description = "Optional stable identifier from this source, passed in sys_object_source_info.")
+    @Schema(title = "Source-native key", description = """
+        Optional stable identifier from this source, passed in sys_object_source_info.
+        """)
     @PluginProperty(group = "source")
     private Property<String> sourceNativeKey;
-    @Schema(title = "Reference tables", description = "Optional field-to-table mapping for additional CI reference fields. owned_by defaults to sys_user.")
+    @Schema(title = "Reference tables", description = """
+        Optional field-to-table mapping for additional CI reference fields. owned_by defaults to sys_user.
+        """)
     @PluginProperty(group = "advanced")
     private Property<Map<String, String>> referenceTables;
-    @Schema(title = "Approved change sys_id", description = "Optional. Re-reads approval through the Change API immediately before a persisted IRE write.")
+    @Schema(title = "Approved change sys_id", description = """
+        Optional. Re-reads approval through the Change API immediately before a persisted IRE write.
+        """)
     @PluginProperty(group = "reliability")
     private Property<String> changeSysId;
     @Builder.Default
-    @Schema(title = "Verify persisted fields", description = "True by default. Reads the CI before and after the write and fails when requested fields differ.", defaultValue = "true")
+    @Schema(title = "Verify persisted fields", description = """
+        True by default. Reads the CI before and after the write and fails when requested fields differ.
+        """, defaultValue = "true")
     @PluginProperty(group = "reliability")
     private Property<Boolean> verify = Property.ofValue(true);
     @Builder.Default
-    @Schema(title = "Dry run", description = "False by default. Uses identifyreconcile/query without a persisted write. Proposed inserts have no committed sys_id.", defaultValue = "false")
+    @Schema(title = "Dry run", description = """
+        False by default. Uses identifyreconcile/query without a persisted write. Proposed inserts have no committed sys_id.
+        """, defaultValue = "false")
     @PluginProperty(group = "main")
     private Property<Boolean> dryRun = Property.ofValue(false);
 
@@ -107,11 +124,11 @@ public class UpsertCI extends AbstractServiceNowPollingTask implements RunnableT
                 rChange = ServiceNowValues.sysId(rChange, "changeSysId");
             }
             var api = api(context, poll);
-            var references = new LinkedHashMap<String, String>(context.render(referenceTables).asMap(String.class, String.class));
+            var rReferences = new LinkedHashMap<String, String>(context.render(referenceTables).asMap(String.class, String.class));
             if (rValues.containsKey("owned_by")) {
-                references.putIfAbsent("owned_by", "sys_user");
+                rReferences.putIfAbsent("owned_by", "sys_user");
             }
-            for (var entry : references.entrySet()) {
+            for (var entry : rReferences.entrySet()) {
                 ServiceNowValues.name(entry.getKey(), "reference field");
                 ServiceNowValues.name(entry.getValue(), "reference table");
                 if (rValues.containsKey(entry.getKey()) && !rValues.get(entry.getKey()).isEmpty()) {
@@ -137,7 +154,7 @@ public class UpsertCI extends AbstractServiceNowPollingTask implements RunnableT
             if (rDryRun) {
                 poll.check();
                 return Output.builder().sysId(proposedId).operation(proposed.path("operation").asText()).before(before)
-                    .after(new LinkedHashMap<>(rValues)).verified(false).dryRun(true).build();
+                    .after(new LinkedHashMap<>(rValues)).verified(false).build();
             }
             if (rChange != null) {
                 ServiceNowRecords.requireApproved(api, rChange);
@@ -153,7 +170,7 @@ public class UpsertCI extends AbstractServiceNowPollingTask implements RunnableT
             }
             poll.check();
             context.logger().info("ServiceNow IRE {} for CI {}", operation, id);
-            return Output.builder().sysId(id).operation(operation).before(before).after(after).verified(rVerify).dryRun(false).build();
+            return Output.builder().sysId(id).operation(operation).before(before).after(after).verified(rVerify).build();
         }
     }
 
@@ -178,7 +195,7 @@ public class UpsertCI extends AbstractServiceNowPollingTask implements RunnableT
                         throw new IllegalStateException("ServiceNow IRE returned a malformed errorCount/errors value. Stop and inspect the result before retrying.");
                     }
                     if (count.asInt(0) > 0 || errors.isArray() && !errors.isEmpty()) {
-                        var details = new java.util.ArrayList<String>();
+                        var details = new ArrayList<String>();
                         if (errors.isArray()) {
                             errors.forEach(error -> details.add(error.path("message").asText("IRE error")));
                         }
@@ -227,17 +244,25 @@ public class UpsertCI extends AbstractServiceNowPollingTask implements RunnableT
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "Reconciled CI sys_id", description = "Null for a proposed INSERT in dryRun.")
+        @Schema(title = "Reconciled CI sys_id", description = """
+            Null for a proposed INSERT in dryRun.
+            """)
         private final String sysId;
-        @Schema(title = "IRE operation", description = "Preserves INSERT, UPDATE, NO_CHANGE and the documented reclassification variants.")
+        @Schema(title = "IRE operation", description = """
+            Preserves INSERT, UPDATE, NO_CHANGE and the documented reclassification variants.
+            """)
         private final String operation;
-        @Schema(title = "Requested fields before the write", description = "Only read when verify is true and the preview identifies an existing CI.")
+        @Schema(title = "Requested fields before the write", description = """
+            Only read when verify is true and the preview identifies an existing CI.
+            """)
         private final Map<String, Object> before;
-        @Schema(title = "Requested fields after the write", description = "Read from the CI when verified; proposed values in dryRun.")
+        @Schema(title = "Requested fields after the write", description = """
+            Read from the CI when verified; proposed values in dryRun.
+            """)
         private final Map<String, Object> after;
-        @Schema(title = "Persisted fields verified", description = "False in dryRun or when verify is false.")
+        @Schema(title = "Persisted fields verified", description = """
+            False in dryRun or when verify is false.
+            """)
         private final Boolean verified;
-        @Schema(title = "Dry run")
-        private final Boolean dryRun;
     }
 }

@@ -1,5 +1,6 @@
 package io.kestra.plugin.servicenow;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -7,10 +8,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 final class ServiceNowRecords {
+    private static final Pattern NUMERIC_STATE = Pattern.compile("[+-]?[0-9]+(?:\\.0+)?");
+    private static final Pattern STATE_WHITESPACE = Pattern.compile("\\s+");
+
     private ServiceNowRecords() {
     }
 
@@ -104,10 +109,10 @@ final class ServiceNowRecords {
             return "";
         }
         var text = value.trim();
-        if (text.matches("[+-]?[0-9]+(?:\\.0+)?")) {
-            return new java.math.BigDecimal(text).stripTrailingZeros().toPlainString();
+        if (NUMERIC_STATE.matcher(text).matches()) {
+            return new BigDecimal(text).stripTrailingZeros().toPlainString();
         }
-        return text.replace('_', ' ').replace('-', ' ').replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        return STATE_WHITESPACE.matcher(text.replace('_', ' ').replace('-', ' ')).replaceAll(" ").toLowerCase(Locale.ROOT);
     }
 
     static boolean isState(JsonNode record, String wanted) {

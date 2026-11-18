@@ -5,13 +5,16 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -27,6 +30,7 @@ import io.kestra.core.http.client.configurations.TimeoutConfiguration;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.models.tasks.retrys.Exponential;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
 
@@ -43,6 +47,7 @@ import lombok.experimental.SuperBuilder;
 public abstract class AbstractServiceNow extends Task {
     private static final ObjectMapper MAPPER = JacksonMapper.ofJson().copy()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private static final Pattern SECRET_HEADER = Pattern.compile(".*(authorization|cookie|token|api.key).*", Pattern.CASE_INSENSITIVE);
 
     @Schema(
         title = "ServiceNow domain",
@@ -119,7 +124,7 @@ public abstract class AbstractServiceNow extends Task {
 
     @Data
     @NoArgsConstructor
-    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RecordResponse {
         Map<String, Object> result;
     }
@@ -234,41 +239,64 @@ public abstract class AbstractServiceNow extends Task {
     }
 
     protected ServiceNowApi api(RunContext context, AbstractServiceNowPollingTask.Poll poll) throws Exception {
+        if (poll != null) {
+            poll.check();
+        }
+        var accessToken = new AtomicReference<String>();
+        if (clientId != null) {
+            accessToken.set(token(context, nativeOptions(options, poll)));
+        }
+        if (poll != null) {
+            poll.check();
+        }
         return new ServiceNowApi(baseUri(context), builder ->
         {
+            var original = builder.build();
+            var configured = configure(context, builder, nativeOptions(options, poll), accessToken.get());
+            var response = nativeRequest(context, configured, poll);
+            if (response.status() == 401 && clientId != null) {
+                accessToken.set(token(context, nativeOptions(options, poll)));
+                var retry = HttpRequest.builder().uri(original.getUri()).method(original.getMethod()).body(original.getBody()).headers(original.getHeaders());
+                var refreshed = configure(context, retry, nativeOptions(options, poll), accessToken.get());
+                var secrets = new HashSet<>(configured.secrets());
+                secrets.addAll(refreshed.secrets());
+                response = nativeRequest(context, new ConfiguredRequest(refreshed.request(), refreshed.options(), Set.copyOf(secrets)), poll);
+            }
+            return response;
+        });
+    }
+
+    private ServiceNowApi.Response nativeRequest(RunContext context, ConfiguredRequest configured, AbstractServiceNowPollingTask.Poll poll) throws Exception {
+        if (poll != null) {
+            poll.check();
+        }
+        var result = new AtomicReference<ServiceNowApi.Response>();
+        try (var client = new HttpClient(context, nativeOptions(configured.options(), poll))) {
+            client.request(configured.request(), response ->
+            {
+                try (var input = response.getBody()) {
+                    var body = input == null ? new byte[0] : input.readNBytes(ServiceNowApi.MAX_RESPONSE_BYTES + 1);
+                    if (body.length > ServiceNowApi.MAX_RESPONSE_BYTES) {
+                        throw new ServiceNowApi.ApiException(response.getStatus().getCode(), "ServiceNow response exceeds 4 MiB. Narrow the query or split the load.");
+                    }
+                    result.set(new ServiceNowApi.Response(response.getStatus().getCode(), body, configured.secrets()));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (Exception e) {
             if (poll != null) {
                 poll.check();
             }
-            var configuredOptions = nativeOptions(options, poll);
-            var configured = configure(context, builder, configuredOptions);
-            var result = new AtomicReference<ServiceNowApi.Response>();
-            try (var client = new HttpClient(context, nativeOptions(configured.options(), poll))) {
-                client.request(configured.request(), response ->
-                {
-                    try (var input = response.getBody()) {
-                        var body = input == null ? new byte[0] : input.readNBytes(ServiceNowApi.MAX_RESPONSE_BYTES + 1);
-                        if (body.length > ServiceNowApi.MAX_RESPONSE_BYTES) {
-                            throw new ServiceNowApi.ApiException(response.getStatus().getCode(), "ServiceNow response exceeds 4 MiB. Narrow the query or split the load.");
-                        }
-                        result.set(new ServiceNowApi.Response(response.getStatus().getCode(), body, configured.secrets()));
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
-            } catch (Exception e) {
-                if (poll != null) {
-                    poll.check();
-                }
-                throw e;
-            }
-            if (poll != null && "GET".equals(configured.request().getMethod())) {
-                poll.check();
-            }
-            if (result.get() == null) {
-                throw new IllegalStateException("ServiceNow returned no response. Check the instance URL and network.");
-            }
-            return result.get();
-        });
+            throw e;
+        }
+        if (poll != null && "GET".equals(configured.request().getMethod())) {
+            poll.check();
+        }
+        if (result.get() == null) {
+            throw new IllegalStateException("ServiceNow returned no response. Check the instance URL and network.");
+        }
+        return result.get();
     }
 
     private HttpConfiguration nativeOptions(HttpConfiguration options, AbstractServiceNowPollingTask.Poll poll) {
@@ -279,28 +307,32 @@ public abstract class AbstractServiceNow extends Task {
         return builder.timeout(TimeoutConfiguration.builder().connectTimeout(Property.ofValue(connectTimeout)).readIdleTimeout(Property.ofValue(readTimeout)).build())
             .auth(options == null ? null : options.getAuth())
             .allowFailed(Property.ofValue(true)).allowedResponseCodes(null).followRedirects(Property.ofValue(false))
-            .logs(null).retry(io.kestra.core.models.tasks.retrys.Exponential.builder().interval(Duration.ofSeconds(1)).maxInterval(Duration.ofSeconds(30)).maxAttempts(1).build()).build();
+            .logs(null).retry(Exponential.builder().interval(Duration.ofSeconds(1)).maxInterval(Duration.ofSeconds(30)).maxAttempts(1).build()).build();
     }
 
     private ConfiguredRequest configure(RunContext context, HttpRequest.HttpRequestBuilder builder, HttpConfiguration configuration)
         throws IllegalVariableEvaluationException, HttpClientException {
+        return configure(context, builder, configuration, clientId == null ? null : token(context, configuration));
+    }
+
+    private ConfiguredRequest configure(RunContext context, HttpRequest.HttpRequestBuilder builder, HttpConfiguration configuration, String accessToken)
+        throws IllegalVariableEvaluationException {
         var rHeaders = addHeaders(context, builder);
         if (rHeaders.keySet().stream().noneMatch("Content-Type"::equalsIgnoreCase)) {
             builder.addHeader("Content-Type", "application/json");
         }
         var secrets = new HashSet<String>();
-        for (var property : java.util.Arrays.asList(username, password, clientId, clientSecret)) {
+        for (var property : Arrays.asList(username, password, clientId, clientSecret)) {
             context.render(property).as(String.class).filter(value -> !value.isBlank()).ifPresent(secrets::add);
         }
         rHeaders.forEach((key, value) ->
         {
-            if (key.toLowerCase(java.util.Locale.ROOT).matches(".*(authorization|cookie|token|api.key).*")) {
+            if (SECRET_HEADER.matcher(key).matches()) {
                 secrets.add(value);
             }
         });
         var configuredOptions = configuration;
-        if (clientId != null) {
-            var accessToken = token(context, configuration);
+        if (accessToken != null) {
             secrets.add(accessToken);
             builder.addHeader("Authorization", "Bearer " + accessToken);
         } else {

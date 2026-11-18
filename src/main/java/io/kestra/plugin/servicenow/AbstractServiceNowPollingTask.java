@@ -38,8 +38,10 @@ public abstract class AbstractServiceNowPollingTask extends AbstractServiceNow i
     private final AtomicBoolean killRequested = new AtomicBoolean();
 
     protected Poll begin(RunContext context, Duration defaultTimeout, Duration maximumTimeout) throws Exception {
-        var timeout = ServiceNowValues.duration(context.render(getTimeout()).as(Duration.class).orElse(null), defaultTimeout, "timeout", maximumTimeout);
-        var poll = new Poll(timeout);
+        var rTimeout = context.render(getTimeout()).as(Duration.class).orElse(defaultTimeout);
+        var budget = rTimeout.compareTo(maximumTimeout) > 0 ? maximumTimeout : rTimeout;
+        ServiceNowValues.duration(budget, defaultTimeout, "timeout", maximumTimeout);
+        var poll = new Poll(budget);
         polls.add(poll);
         if (killRequested.get()) {
             poll.cancel();
