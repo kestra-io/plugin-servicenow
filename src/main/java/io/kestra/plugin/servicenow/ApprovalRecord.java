@@ -15,10 +15,14 @@ public class ApprovalRecord {
     private final String name;
     @Schema(title = "Approver email")
     private final String email;
-    @Schema(title = "Approval record state", description = "The state returned by sysapproval_approver, including pending or cancelled records.")
+    @Schema(title = "Approval record state", description = """
+        The state returned by sysapproval_approver, including pending or cancelled records.
+        """)
     private final String state;
     @Schema(title = "Approver comments")
     private final String comments;
-    @Schema(title = "Record update time", description = "sys_updated_on in UTC. This is the last record update, not a guaranteed decision-event timestamp.")
+    @Schema(title = "Record update time", description = """
+        sys_updated_on in UTC. This is the last record update, not a guaranteed decision-event timestamp.
+        """)
     private final Instant updatedAt;
 }

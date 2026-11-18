@@ -41,6 +41,9 @@ public abstract class AbstractServiceNowPollingTask extends AbstractServiceNow i
         var rTimeout = context.render(getTimeout()).as(Duration.class).orElse(defaultTimeout);
         var budget = rTimeout.compareTo(maximumTimeout) > 0 ? maximumTimeout : rTimeout;
         ServiceNowValues.duration(budget, defaultTimeout, "timeout", maximumTimeout);
+        if (rTimeout.compareTo(maximumTimeout) > 0) {
+            context.logger().warn("ServiceNow timeout {} exceeds the {} polling cap. Polling stops after {}.", rTimeout, maximumTimeout, budget);
+        }
         var poll = new Poll(budget);
         polls.add(poll);
         if (killRequested.get()) {
