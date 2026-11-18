@@ -49,12 +49,14 @@ class CreateIncidentTest {
 
         var output = task.run(runContextFactory.of());
 
-        verify(postRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
-            .withRequestBody(matchingJsonPath("$.short_description", equalTo("Payment API is failing")))
-            .withRequestBody(matchingJsonPath("$.description", equalTo("Checkout returns a 502")))
-            .withRequestBody(matchingJsonPath("$.urgency", equalTo("1")))
-            .withRequestBody(matchingJsonPath("$.impact", equalTo("2")))
-            .withRequestBody(matchingJsonPath("$.caller_id", equalTo("abc"))));
+        verify(
+            postRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+                .withRequestBody(matchingJsonPath("$.short_description", equalTo("Payment API is failing")))
+                .withRequestBody(matchingJsonPath("$.description", equalTo("Checkout returns a 502")))
+                .withRequestBody(matchingJsonPath("$.urgency", equalTo("1")))
+                .withRequestBody(matchingJsonPath("$.impact", equalTo("2")))
+                .withRequestBody(matchingJsonPath("$.caller_id", equalTo("abc")))
+        );
         assertThat(output.getNumber(), is("INC0010002"));
         assertThat(output.getUrl(), is(wmRuntimeInfo.getHttpBaseUrl() + "/service-now.com/incident.do?sys_id=c537bae64f411200adf9f8e18110c76e"));
     }
@@ -78,8 +80,10 @@ class CreateIncidentTest {
 
         task.run(runContextFactory.of());
 
-        verify(postRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
-            .withRequestBody(matchingJsonPath("$.description", equalTo("from data"))));
+        verify(
+            postRequestedFor(urlPathEqualTo("/service-now.com/api/now/table/incident"))
+                .withRequestBody(matchingJsonPath("$.description", equalTo("from data")))
+        );
     }
 
     @Test

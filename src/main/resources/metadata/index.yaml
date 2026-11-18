@@ -1,8 +1,8 @@
 group: io.kestra.plugin.servicenow
 name: "servicenow"
 title: "ServiceNow"
-description: "Tasks that create, update, read, and delete ServiceNow records via REST."
-body: "Set the ServiceNow instance URL with credentials or basic auth, choose the table, and provide request bodies or sys_ids to post, update, fetch, or delete records; responses include the JSON payloads for downstream handling."
+description: "ServiceNow record, change approval, Import Set and CMDB reconciliation tasks."
+body: "Use native Change Management APIs for approvals and transitions, synchronous Import Sets for transform-map ingestion and IRE for verified CI upserts. Existing Table API tasks remain available for generic records. Configure instance credentials and the required API/table ACLs through Kestra secrets."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

@@ -4,6 +4,7 @@
 
 - Provides plugin components under `io.kestra.plugin.servicenow`.
 - Includes classes such as `Delete`, `Update`, `Post`, `Get`.
+- Native operations: `CreateChange`, `WaitForApproval`, `TransitionChange`, `LoadImportSet` and `UpsertCI`.
 
 ## Why
 
@@ -23,6 +24,10 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 
 - `io.kestra.plugin.servicenow.Get`
 - `io.kestra.plugin.servicenow.Post`
+- `AbstractServiceNow` shares authentication and bounded native API transport. Native runs cache OAuth tokens in their transport, not on the task.
+- `ServiceNowRecords` resolves references, unwraps native fields and checks current model transitions while preserving negative state codes.
+- `LoadImportSet` submits synchronous single rows, records every transform-map result and fails on configured statuses even inside HTTP 201. Input rows and transform results have different counts.
+- `UpsertCI` uses IRE/query for identification and IRE for commits. Table API calls are read-only verification/reference lookups.
 
 ### Project Structure
 
